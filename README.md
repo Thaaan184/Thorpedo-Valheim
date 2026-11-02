@@ -75,7 +75,8 @@ Server mengoperasikan mod mandiri di sisi server via BepInEx. Pemain **tidak per
 
 1. **`NoCheatFlag.dll`**: Membersihkan status `m_cheated` dari semua item yang jatuh di alam dan peti penyimpanan, mencegah bug infeksi cheat bawaan Valheim 1.0 yang dapat mengunci progres achievement pemain.
 2. **`ScheduledMessages.dll`**: Mengirimkan peringatan teks langsung di tengah layar semua pemain di dalam game sebelum siklus pemulihan alam dimulai (T-10m, T-5m, dan T-1m).
-3. **`NetworkPerformanceSystem.dll`**: Optimasi throughput sinkronisasi ZDO, kompensasi latensi, dan ukuran window paket UDP antar-pemain.
+3. **`Gjallarhorn.dll`**: Kill-feed & death announcer Nordik server-side. Menyiarkan kabar gugurnya ksatria (beserta monster/penyebab kematian) dan tumbangnya boss dunia langsung di chat dan banner tengah layar.
+4. **`NetworkPerformanceSystem.dll`**: Optimasi throughput sinkronisasi ZDO, kompensasi latensi, dan ukuran window paket UDP antar-pemain.
 
 ---
 
