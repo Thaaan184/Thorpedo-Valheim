@@ -1,0 +1,17 @@
+[Unit]
+Description=Thorpedo Valheim Discord Event Monitor
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=llm
+WorkingDirectory=/opt/thorpedo
+ExecStart=/usr/bin/python3 -u /opt/thorpedo/scripts/valheim_monitor.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/opt/thorpedo/logs/monitor.log
+StandardError=append:/opt/thorpedo/logs/monitor.log
+
+[Install]
+WantedBy=multi-user.target

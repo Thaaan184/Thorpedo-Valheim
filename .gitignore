@@ -1,0 +1,16 @@
+# Environment secrets
+.env
+*.env.local
+
+# Runtime game data and caches
+data/
+backups/
+logs/
+__pycache__/
+*.pyc
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
