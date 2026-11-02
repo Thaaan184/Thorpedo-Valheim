@@ -360,6 +360,7 @@ def main():
     t = threading.Thread(target=periodic_announcer_loop, daemon=True)
     t.start()
 
+    re_boot = re.compile(r"Game server connected")
     re_code = re.compile(r"with join code (\d+)")
     re_playfab_steam = re.compile(r"PlayFab socket with remote ID playfab/(\S+) received local Platform ID Steam_(\d+)")
     re_handshake = re.compile(r"Got handshake from client (\S+)")
@@ -387,6 +388,12 @@ def main():
                 if not line:
                     break
                 line = line.strip()
+
+                # 0. Container reboot detected
+                if re_boot.search(line):
+                    with lock:
+                        last_join_code = None
+                    continue
 
                 # 1. Join Code
                 m_code = re_code.search(line)
