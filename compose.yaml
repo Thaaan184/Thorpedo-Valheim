@@ -19,6 +19,7 @@ services:
       - ./plugins/ScheduledMessages.dll:/opt/bepinex/BepInEx/plugins/ScheduledMessages.dll:ro
       - ./plugins/Gjallarhorn.dll:/opt/bepinex/BepInEx/plugins/Gjallarhorn.dll:ro
       - ./plugins/WorkbenchLove.dll:/opt/bepinex/BepInEx/plugins/WorkbenchLove.dll:ro
+      - ./plugins/ServerDevcommands.dll:/opt/bepinex/BepInEx/plugins/ServerDevcommands.dll:ro
       - ./config/scheduledmessages.cfg:/valheim/BepInEx/config/scheduledmessages.cfg:rw
     stop_grace_period: 2m
     healthcheck:
