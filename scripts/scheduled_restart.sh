@@ -50,6 +50,6 @@ python3 "${SCRIPT_DIR}/backup_to_release.py" \
 
 # 5. Nyalakan kembali container game
 echo "[$(date -Iseconds)] Menyalakan kembali Valheim dedicated server..."
-docker compose -p thorpedo start valheim
+docker compose -p thorpedo -f "${ROOT_DIR}/compose.yaml" up -d valheim
 
 echo "[$(date -Iseconds)] Siklus restorasi selesai. Monitor akan menyiarkan Join Code baru sesaat lagi."
