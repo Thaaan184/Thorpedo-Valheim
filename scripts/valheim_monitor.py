@@ -353,12 +353,48 @@ def periodic_announcer_loop():
             print(f"[{datetime.now()}] Hourly announcer error: {e}")
             time.sleep(30)
 
+def get_container_id():
+    try:
+        out = subprocess.check_output(
+            ["docker", "inspect", "-f", "{{.Id}}", "thorpedo-valheim"],
+            stderr=subprocess.DEVNULL,
+            text=True
+        ).strip()
+        return out
+    except Exception:
+        return None
+
+
+def container_watchdog(proc_ref):
+    current_cid = get_container_id()
+    while True:
+        time.sleep(5)
+        new_cid = get_container_id()
+        if new_cid and current_cid and new_cid != current_cid:
+            print(f"[WATCHDOG] Container recreated ({current_cid[:12]} -> {new_cid[:12]}). Terminating old log stream...")
+            current_cid = new_cid
+            with lock:
+                global last_join_code
+                last_join_code = None
+            if proc_ref[0]:
+                try:
+                    proc_ref[0].terminate()
+                except Exception:
+                    pass
+        elif new_cid and not current_cid:
+            current_cid = new_cid
+
+
 def main():
-    print(f"[{datetime.now()}] Starting Thorpedo Discord Monitor v2.0...")
+    print("Starting Thorpedo Discord Monitor v2.0...")
     load_latest_release_info()
 
-    t = threading.Thread(target=periodic_announcer_loop, daemon=True)
-    t.start()
+    t_announcer = threading.Thread(target=periodic_announcer_loop, daemon=True)
+    t_announcer.start()
+
+    proc_ref: list = [None]
+    t_watchdog = threading.Thread(target=container_watchdog, args=(proc_ref,), daemon=True)
+    t_watchdog.start()
 
     re_boot = re.compile(r"Game server connected")
     re_code = re.compile(r"with join code (\d+)")
@@ -380,6 +416,7 @@ def main():
                 text=True,
                 bufsize=1
             )
+            proc_ref[0] = proc
             if not proc.stdout:
                 time.sleep(3)
                 continue
