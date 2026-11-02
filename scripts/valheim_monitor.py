@@ -114,10 +114,10 @@ def fetch_current_join_code():
         print(f"[{datetime.now()}] Error reading docker logs for join code: {e}")
     return "795624"
 
-def handle_join_code(code: str):
+def handle_join_code(code: str, force: bool = False):
     global last_join_code, last_broadcast_time
     with lock:
-        if last_join_code == code:
+        if not force and last_join_code == code:
             return
         last_join_code = code
         last_broadcast_time = time.time()
@@ -145,7 +145,7 @@ def handle_join_code(code: str):
         },
         {
             "name": "🔄 Siklus Pemulihan Alam",
-            "value": "Tiap 6 jam: `06:00` • `12:00` • `18:00` • `00:00 WIB`",
+            "value": "Tiap jam 6: `06:00` & `18:00 WIB`",
             "inline": False
         }
     ]
@@ -192,7 +192,7 @@ def broadcast_hourly_status():
         {"name": field_title, "value": status_pejuang, "inline": False},
         {
             "name": "🔄 Siklus Pemulihan Alam Berikutnya",
-            "value": "`06:00` • `12:00` • `18:00` • `00:00 WIB`",
+            "value": "Tiap jam 6: `06:00` & `18:00 WIB`",
             "inline": False
         }
     ]
@@ -397,7 +397,7 @@ def main():
     t_watchdog.start()
 
     re_boot = re.compile(r"Game server connected")
-    re_code = re.compile(r"with join code (\d+)")
+    re_active = re.compile(r"with join code (\d+).*?is active with \d+ player\(s\)")
     re_playfab_steam = re.compile(r"PlayFab socket with remote ID playfab/(\S+) received local Platform ID Steam_(\d+)")
     re_handshake = re.compile(r"Got handshake from client (\S+)")
     re_char = re.compile(r"Got character ZDOID from (\S+) : (\d+):1")
@@ -406,6 +406,8 @@ def main():
     re_closing = re.compile(r"Closing socket (\S+)")
     re_zdo_destroy = re.compile(r"Destroying abandoned non persistent zdo (\d+):1 owner \1")
     re_conn_lost = re.compile(r"Keep socket for playfab/(\S+), try to reconnect")
+
+    server_just_booted = False
 
     while True:
         try:
@@ -430,12 +432,16 @@ def main():
                 if re_boot.search(line):
                     with lock:
                         last_join_code = None
+                        server_just_booted = True
+                        active_sessions.clear()
+                        pending_connections.clear()
                     continue
 
-                # 1. Join Code
-                m_code = re_code.search(line)
-                if m_code:
-                    handle_join_code(m_code.group(1))
+                # 1. Join Code verified active (Server is confirmed ready and accepting connections)
+                m_active = re_active.search(line)
+                if m_active:
+                    handle_join_code(m_active.group(1), force=server_just_booted)
+                    server_just_booted = False
                     continue
 
                 # 2. Player history entry (Cache Steam personas directly from engine)

@@ -82,10 +82,10 @@ Server mengoperasikan mod mandiri di sisi server via BepInEx. Pemain **tidak per
 
 ---
 
-## 🔄 Siklus Pemulihan Alam Terjadwal (6-Hour Cycle)
+## 🔄 Siklus Pemulihan Alam Terjadwal (Tiap Jam 6)
 
-Server menjalankan pembersihan cache, defragmentasi ZDO, dan kompresi data rutin setiap 6 jam pada pukul:
-**`06:00` • `12:00` • `18:00` • `00:00 WIB`**
+Server menjalankan pembersihan cache, defragmentasi ZDO, dan kompresi data rutin tiap jam 6 pada pukul:
+**`06:00` & `18:00 WIB`**
 
 ### Urutan Prosedur:
 1. **Peringatan Dalam Game**: Banner teks peringatan muncul di layar pemain 10 menit, 5 menit, dan 1 menit sebelum server mati.
@@ -140,6 +140,6 @@ sudo systemctl enable --now thorpedo-monitor.service
 
 ### 4. Jadwalkan Crontab Host
 ```cron
-# Eksekusi restart setiap pukul 06:00, 12:00, 18:00, 00:00 WIB (UTC+7 -> 23:00, 05:00, 11:00, 17:00 UTC)
-55 4,10,16,22 * * * /opt/thorpedo/scripts/scheduled_restart.sh >> /opt/thorpedo/logs/restart.log 2>&1
+# Eksekusi restart setiap pukul 06:00 dan 18:00 WIB (UTC+7 -> 22:55 dan 10:55 UTC)
+55 10,22 * * * /opt/thorpedo/scripts/scheduled_restart.sh >> /opt/thorpedo/logs/restart.log 2>&1
 ```
