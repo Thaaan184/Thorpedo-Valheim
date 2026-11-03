@@ -145,7 +145,7 @@ def handle_join_code(code: str, force: bool = False):
         },
         {
             "name": "🔄 Siklus Pemulihan Alam",
-            "value": "Tiap jam 6: `06:00` & `18:00 WIB`",
+            "value": "Tiap 6 jam: `01:00` • `07:00` • `13:00` • `19:00 WIB`",
             "inline": False
         }
     ]
@@ -192,7 +192,7 @@ def broadcast_hourly_status():
         {"name": field_title, "value": status_pejuang, "inline": False},
         {
             "name": "🔄 Siklus Pemulihan Alam Berikutnya",
-            "value": "Tiap jam 6: `06:00` & `18:00 WIB`",
+            "value": "`01:00` • `07:00` • `13:00` • `19:00 WIB`",
             "inline": False
         }
     ]
