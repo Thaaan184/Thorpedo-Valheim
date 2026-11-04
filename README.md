@@ -78,7 +78,8 @@ Server mengoperasikan mod mandiri di sisi server via BepInEx. Pemain **tidak per
 3. **`Gjallarhorn.dll`**: Kill-feed & death announcer Nordik server-side. Menyiarkan kabar gugurnya ksatria (beserta monster/penyebab kematian) dan tumbangnya boss dunia langsung di chat dan banner tengah layar.
 4. **`WorkbenchLove.dll`**: Memperluas radius perlindungan dan pencegah spawn monster meja kerja (workbench protection & anti-mob spawn radius) dari 20m menjadi 40m.
 5. **`ServerDevcommands.dll`**: Membuka kunci perintah administratif darurat untuk admin server (skip time, forcedelete glitch item, stopevent raid, save paksa).
-6. **`NetworkPerformanceSystem.dll`**: Optimasi throughput sinkronisasi ZDO, kompensasi latensi, dan ukuran window paket UDP antar-pemain.
+6. **`CrossplayJoinCodeFix.dll`**: Mencegah bug NullReferenceException bawaan Valheim saat inisialisasi lobi PlayFab, memastikan Join Code selalu berhasil resolve di cloud Microsoft.
+7. **`NetworkPerformanceSystem.dll`**: Optimasi throughput sinkronisasi ZDO, kompensasi latensi, dan ukuran window paket UDP antar-pemain.
 
 ---
 
