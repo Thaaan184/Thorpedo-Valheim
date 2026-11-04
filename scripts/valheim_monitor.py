@@ -39,6 +39,15 @@ last_join_code = None
 last_broadcast_time = time.time()
 latest_release_cache = {}
 
+# Autonomous Health & Self-Healing Watchdog State
+boot_time = None
+is_server_active = False
+last_heartbeat_time = time.time()
+server_uptime_start = time.time()
+auto_heal_history = []
+self_heal_lock = threading.Lock()
+self_heal_in_progress = False
+
 def get_steam_profile(steam_id: str):
     if not steam_id or not steam_id.isdigit() or len(steam_id) != 17:
         return "", ""
@@ -353,6 +362,95 @@ def periodic_announcer_loop():
             print(f"[{datetime.now()}] Hourly announcer error: {e}")
             time.sleep(30)
 
+def trigger_self_heal(reason: str):
+    global auto_heal_history, is_server_active, boot_time, self_heal_in_progress
+    with self_heal_lock:
+        if self_heal_in_progress:
+            return
+        self_heal_in_progress = True
+
+    try:
+        now = time.time()
+        # Suppress flapping if >= 3 heals in 15 minutes
+        auto_heal_history = [t for t in auto_heal_history if now - t < 900]
+        if len(auto_heal_history) >= 3:
+            print(f"[{datetime.now()}] [SELF-HEAL SUPPRESSED] 3 restarts in 15m. Backing off 10 mins.")
+            send_embed({
+                "title": "⚡・Peringatan Badai: Gangguan Layanan Cloud",
+                "description": "Layanan PlayFab Microsoft mengalami kegagalan berulang. Siklus pemulihan otomatis ditahan 10 menit untuk mencegah loop.",
+                "color": 13789470, # 0xD2691E
+                "fields": [
+                    {"name": "Penyebab Terakhir", "value": f"`{reason}`", "inline": False},
+                    {"name": "Status", "value": "Menunggu 10 menit sebelum mencoba menghubungkan ulang ke PlayFab.", "inline": False}
+                ],
+                "footer": {"text": FOOTER_TEXT, "icon_url": BOT_AVATAR},
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+            time.sleep(600)
+            auto_heal_history.clear()
+            return
+
+        auto_heal_history.append(now)
+        print(f"[{datetime.now()}] [SELF-HEAL TRIGGERED] {reason}")
+
+        send_embed({
+            "title": "🛡️・Pemulihan Mandiri Yggdrasil",
+            "description": "Mekanisme pengawas mendeteksi anomali pada lobi PlayFab. Server dipulihkan otomatis ke kondisi bersih tanpa intervensi manual.",
+            "color": 15158332, # 0xE74C3C
+            "fields": [
+                {"name": "🔍 Indikasi Anomali", "value": f"`{reason}`", "inline": False},
+                {"name": "⚙️ Tindakan Otomatis", "value": "Flushing save data → Restart container → Re-register Join Code.", "inline": False}
+            ],
+            "footer": {"text": FOOTER_TEXT, "icon_url": BOT_AVATAR},
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+
+        with lock:
+            is_server_active = False
+            boot_time = None
+
+        try:
+            subprocess.run(["/opt/thorpedo/scripts/scheduled_restart.sh", "--now"], timeout=240)
+        except Exception as e:
+            print(f"[{datetime.now()}] Self-heal execution error: {e}")
+    finally:
+        with self_heal_lock:
+            self_heal_in_progress = False
+
+
+def autonomous_health_watchdog():
+    global boot_time, is_server_active, last_heartbeat_time, server_uptime_start
+    print(f"[{datetime.now()}] Autonomous health & self-healing watchdog active.")
+    while True:
+        try:
+            time.sleep(15)
+            now = time.time()
+
+            # 1. Check Boot Stall (> 180s without active lobby)
+            if boot_time is not None and not is_server_active:
+                if now - boot_time > 180:
+                    trigger_self_heal("Boot Stall: Lobi PlayFab gagal aktif setelah 180 detik pasca-boot.")
+                    continue
+
+            # 2. Check Engine / Socket Freeze when idle (> 25 mins without heartbeat when 0 players)
+            with lock:
+                online_count = len(active_sessions)
+
+            if is_server_active and online_count == 0:
+                if now - last_heartbeat_time > 1500: # 25 minutes
+                    trigger_self_heal("Engine Freeze: Tidak ada aktivitas detak jantung PlayFab selama lebih dari 25 menit saat server kosong.")
+                    continue
+
+            # 3. Check Stale Idle Lobby Prevention (> 8 hours idle with 0 players)
+            if is_server_active and online_count == 0:
+                if now - server_uptime_start > 8 * 3600: # 8 hours
+                    trigger_self_heal("Penyegaran Preventif: Server kosong melebihi 8 jam. Lobi diperbarui otomatis sebelum batas kedaluwarsa PlayFab tercapai.")
+                    continue
+        except Exception as e:
+            print(f"[{datetime.now()}] Watchdog loop error: {e}")
+            time.sleep(15)
+
+
 def get_container_id():
     try:
         out = subprocess.check_output(
@@ -396,8 +494,13 @@ def main():
     t_watchdog = threading.Thread(target=container_watchdog, args=(proc_ref,), daemon=True)
     t_watchdog.start()
 
+    t_health = threading.Thread(target=autonomous_health_watchdog, daemon=True)
+    t_health.start()
+
     re_boot = re.compile(r"Game server connected")
     re_active = re.compile(r"with join code (\d+).*?is active with \d+ player\(s\)")
+    re_heartbeat = re.compile(r"(Connections \d+ ZDOS:\d+|Update PlayFab entity token|Lobby .*? refreshed|is active with \d+ player\(s\))")
+    re_fatal = re.compile(r"(ZPlayFabMatchmaking::UnregisterServer|PlayFab create lobby failed|ZPlayFabSocket::Dispose\. leave lobby|Keep socket for playfab/.*?failed to reconnect|ZPlayFabMatchmaking.*?OnRefreshFailed)")
     re_playfab_steam = re.compile(r"PlayFab socket with remote ID playfab/(\S+) received local Platform ID Steam_(\d+)")
     re_handshake = re.compile(r"Got handshake from client (\S+)")
     re_char = re.compile(r"Got character ZDOID from (\S+) : (\d+):1")
@@ -428,18 +531,38 @@ def main():
                     break
                 line = line.strip()
 
-                # 0. Container reboot detected
+                # 0. Update Heartbeat
+                if re_heartbeat.search(line):
+                    last_heartbeat_time = time.time()
+
+                # 0.1 Container reboot detected
                 if re_boot.search(line):
                     with lock:
                         last_join_code = None
                         server_just_booted = True
                         active_sessions.clear()
                         pending_connections.clear()
+                        boot_time = time.time()
+                        is_server_active = False
+                        last_heartbeat_time = time.time()
+                        server_uptime_start = time.time()
                     continue
+
+                # 0.2 Fatal Lobby De-registration
+                if re_fatal.search(line):
+                    with lock:
+                        online_count = len(active_sessions)
+                    if online_count == 0:
+                        trigger_self_heal(f"Lobby Disconnected: Terdeteksi sinyal pemutusan lobi ({line[:80]})")
+                        continue
 
                 # 1. Join Code verified active (Server is confirmed ready and accepting connections)
                 m_active = re_active.search(line)
                 if m_active:
+                    with lock:
+                        boot_time = None
+                        is_server_active = True
+                        last_heartbeat_time = time.time()
                     handle_join_code(m_active.group(1), force=server_just_booted)
                     server_just_booted = False
                     continue

@@ -97,6 +97,17 @@ Server menjalankan pembersihan cache, defragmentasi ZDO, dan kompresi data rutin
 
 ---
 
+## 🛡️ Sistem Pengawas Otonom (Autonomous Self-Healing Watchdog)
+
+Server dilengkapi watchdog otomatis pada daemon `valheim_monitor.py` yang berjalan di background untuk memitigasi desinkronisasi PlayFab tanpa campur tangan manusia/AI:
+1. **Pencegah Boot Stall**: Jika lobi PlayFab gagal mencapai status `is active` dalam 180 detik pasca-boot, watchdog mengeksekusi graceful restart otomatis.
+2. **Pendeteksi Putusnya Lobi**: Menangkap sinyal `ZPlayFabMatchmaking::UnregisterServer` atau exception cloud PlayFab saat server kosong, dan langsung memulihkan sesi.
+3. **Penyegaran Idle (>8 Jam)**: Merestart halus server secara proaktif saat server kosong melebihi 8 jam untuk mencegah batas kedaluwarsa lobi (idle timeout) PlayFab Azure.
+4. **Proteksi Anti-Thrashing / Flapping**: Maksimal 3 kali siklus pemulihan per 15 menit. Jika Azure mengalami pemadaman global, sistem menahan reboot selama 10 menit guna mencegah loop tiada henti.
+5. **Guard Pemain Aktif**: Tidak pernah merestart server secara paksa jika ada pemain yang sedang online, kecuali terjadi engine deadlock total (>25 menit hening).
+
+---
+
 ## 📁 Struktur Direktori Repositori
 
 ```
