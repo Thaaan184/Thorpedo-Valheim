@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thorpedo - Valheim Management Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              base: '#0F1115',
+              surface: '#161A22',
+              border: '#242C38',
+              amber: '#D97706',
+              emerald: '#10B981',
+              crimson: '#EF4444',
+              text: '#F1F5F9',
+              muted: '#94A3B8',
+            }
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['"Inter"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    /* Custom scrollbar for dark console */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0F1115; }
+    ::-webkit-scrollbar-thumb { background: #242C38; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+  </style>
+</head>
+<body class="bg-[#0F1115] text-[#F1F5F9] font-sans antialiased h-screen overflow-hidden flex" x-data="panelApp()" x-init="init()">
+
+  <!-- Toast Notification System -->
+  <div class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" x-cloak>
+    <template x-for="toast in toasts" :key="toast.id">
+      <div 
+        class="pointer-events-auto px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-3 transition transform border"
+        :class="{
+          'bg-[#15302F] border-[#10B981] text-[#A7F3D0]': toast.type === 'success',
+          'bg-[#3B1215] border-[#EF4444] text-[#FECACA]': toast.type === 'error',
+          'bg-[#2A2011] border-[#D97706] text-[#FDE68A]': toast.type === 'warning'
+        }"
+      >
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- SIDEBAR (220px Fixed) -->
+  <aside class="w-[220px] bg-[#161A22] border-r border-[#242C38] flex flex-col justify-between p-4 flex-shrink-0 select-none">
+    <div>
+      <!-- Brand Logo -->
+      <div class="mb-6 px-2 pt-1">
+        <div class="font-mono font-bold text-lg text-[#D97706] tracking-wider">THORPEDO</div>
+        <div class="font-mono text-[10px] text-[#94A3B8] uppercase tracking-widest">Valheim Panel</div>
+      </div>
+
+      <!-- Navigation Menu -->
+      <nav class="space-y-1">
+        <!-- Tab 1: Dashboard -->
+        <button 
+          @click="currentTab = 'dashboard'" 
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition text-left"
+          :class="currentTab === 'dashboard' ? 'bg-[#0F1115] text-[#D97706] border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+          <span>Dashboard</span>
+        </button>
+
+        <!-- Tab 2: World Modifiers -->
+        <button 
+          @click="currentTab = 'modifiers'" 
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition text-left"
+          :class="currentTab === 'modifiers' ? 'bg-[#0F1115] text-[#D97706] border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>World Modifiers</span>
+        </button>
+
+        <!-- Tab 3: Snapshots -->
+        <button 
+          @click="currentTab = 'snapshots'" 
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition text-left"
+          :class="currentTab === 'snapshots' ? 'bg-[#0F1115] text-[#D97706] border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+          <span>Snapshots</span>
+        </button>
+
+        <!-- Tab 4: Mod Manager -->
+        <button 
+          @click="currentTab = 'mods'" 
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition text-left"
+          :class="currentTab === 'mods' ? 'bg-[#0F1115] text-[#D97706] border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          <span>Mod Manager</span>
+        </button>
+
+        <!-- Tab 5: Pemain & Console -->
+        <button 
+          @click="currentTab = 'players'" 
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition text-left"
+          :class="currentTab === 'players' ? 'bg-[#0F1115] text-[#D97706] border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#0F1115]/50'"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>Pemain & Console</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Sidebar Bottom Info & Logout -->
+    <div class="pt-4 border-t border-[#242C38] space-y-2">
+      <div class="px-2">
+        <div class="text-[10px] font-mono text-[#94A3B8] uppercase">Direct Join IP</div>
+        <div class="text-xs font-mono text-[#F1F5F9]" x-text="playfab.ip + ':' + playfab.port"></div>
+      </div>
+      <a href="/logout" class="block w-full text-center px-3 py-2 rounded-md text-xs font-mono text-[#EF4444] hover:bg-[#EF4444]/10 transition">
+        Keluar (Logout)
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT (Flex 1, Overflow Auto) -->
+  <main class="flex-1 flex flex-col overflow-y-auto bg-[#0F1115] p-6 lg:p-8">
+
+    <!-- ========================================== -->
+    <!-- 01 DASHBOARD -->
+    <!-- ========================================== -->
+    <div x-show="currentTab === 'dashboard'" x-cloak class="space-y-6 max-w-6xl w-full">
+      
+      <!-- Header Bar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="font-mono text-xl font-bold text-[#F1F5F9]">Dashboard</h1>
+          <p class="text-xs text-[#94A3B8]">Diagnostik PlayFab & operasional server real-time</p>
+        </div>
+
+        <!-- Telemetry Status Pills -->
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div class="px-3 py-1.5 rounded-full border flex items-center gap-2"
+               :class="server.running ? 'bg-[#15302F] border-[#10B981] text-[#10B981]' : 'bg-[#3B1215] border-[#EF4444] text-[#EF4444]'">
+            <span class="w-2 h-2 rounded-full" :class="server.running ? 'bg-[#10B981] animate-pulse' : 'bg-[#EF4444]'"></span>
+            <span x-text="'ENGINE: ' + (server.running ? 'RUNNING' : 'STOPPED')"></span>
+          </div>
+
+          <div class="px-3 py-1.5 rounded-full border flex items-center gap-2"
+               :class="playfab.is_active ? 'bg-[#15302F] border-[#10B981] text-[#10B981]' : 'bg-[#3B1215] border-[#EF4444] text-[#EF4444]'">
+            <span class="w-2 h-2 rounded-full" :class="playfab.is_active ? 'bg-[#10B981]' : 'bg-[#EF4444]'"></span>
+            <span x-text="'PLAYFAB: ' + (playfab.is_active ? 'ACTIVE IN CLOUD' : 'UNREGISTERED')"></span>
+          </div>
+
+          <div class="bg-[#161A22] border border-[#242C38] px-3 py-1.5 rounded-full text-[#94A3B8]">
+            CPU <span class="text-[#F1F5F9]" x-text="metrics.cpu_usage_pct + '%'"></span>
+          </div>
+          <div class="bg-[#161A22] border border-[#242C38] px-3 py-1.5 rounded-full text-[#94A3B8]">
+            RAM <span class="text-[#F1F5F9]" x-text="metrics.memory_used_gb + ' / ' + metrics.memory_total_gb + ' GB'"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Row: Join Code & Quick Actions -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- Join Code Card (5 cols) -->
+        <div class="lg:col-span-5 bg-[#161A22] border border-[#242C38] rounded-xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
+          <div class="absolute -right-6 -bottom-6 opacity-5 font-mono text-9xl text-[#D97706] font-bold select-none">CODE</div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-mono text-xs text-[#94A3B8] uppercase tracking-wider">Join Code PlayFab</span>
+              <span class="text-[11px] font-mono text-[#10B981] bg-[#15302F] px-2 py-0.5 rounded border border-[#10B981]/30">Crossplay Ready</span>
+            </div>
+            
+            <div class="flex items-center gap-4 my-2">
+              <div class="font-mono font-bold text-5xl text-[#D97706] tracking-wider" x-text="playfab.join_code">------</div>
+              <button 
+                @click="copyToClipboard(playfab.join_code, 'Join Code disalin!')" 
+                class="bg-[#0F1115] hover:bg-[#242C38] border border-[#242C38] text-[#F1F5F9] px-3 py-2 rounded-lg text-xs font-mono transition flex items-center gap-1.5"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <span>Salin</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-4 mt-4 border-t border-[#242C38] flex items-center justify-between text-xs text-[#94A3B8]">
+            <span class="font-mono" x-text="'Diperbarui ' + playfab.last_refresh"></span>
+            <span class="font-mono" x-text="'Password: [REDACTED]'"></span>
+          </div>
+        </div>
+
+        <!-- Quick Action Bar (7 cols) -->
+        <div class="lg:col-span-7 bg-[#161A22] border border-[#242C38] rounded-xl p-6 flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="font-mono text-xs text-[#94A3B8] uppercase tracking-wider mb-3">Aksi Operasional Cepat</div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-2.5">
+              <button 
+                @click="executeAction('check_playfab')" 
+                :disabled="loadingAction"
+                class="bg-[#0F1115] hover:bg-[#242C38] border border-[#242C38] text-[#F1F5F9] px-3 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 text-center"
+              >
+                <svg class="w-3.5 h-3.5 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Periksa Lobi PlayFab</span>
+              </button>
+
+              <button 
+                @click="executeAction('reset_playfab')" 
+                :disabled="loadingAction"
+                class="bg-[#EF4444]/10 hover:bg-[#EF4444]/20 border border-[#EF4444]/40 text-[#EF4444] px-3 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 text-center"
+              >
+                <svg class="w-3.5 h-3.5 text-[#EF4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Reset Lobi Darurat</span>
+              </button>
+
+              <button 
+                @click="executeAction('broadcast_discord')" 
+                :disabled="loadingAction"
+                class="bg-[#0F1115] hover:bg-[#242C38] border border-[#242C38] text-[#F1F5F9] px-3 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 text-center"
+              >
+                <svg class="w-3.5 h-3.5 text-[#D97706]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span>Siarkan ke Discord</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button 
+                @click="executeAction('force_save')" 
+                :disabled="loadingAction"
+                class="bg-[#0F1115] hover:bg-[#242C38] border border-[#242C38] text-[#F1F5F9] px-4 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2"
+              >
+                <svg class="w-3.5 h-3.5 text-[#94A3B8]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                <span>Paksa Simpan Dunia (Save)</span>
+              </button>
+
+              <button 
+                @click="openRestartModal = true" 
+                class="bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-bold px-4 py-2.5 rounded-lg text-xs font-mono transition flex items-center justify-center gap-2 shadow-lg shadow-[#D97706]/10"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span>Restorasi Berencana (Restart)</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="text-[11px] text-[#94A3B8] font-mono mt-3">
+            * Pilihan restart: Graceful countdown in-game (5m, 1m) atau --now instan.
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Players Roster -->
+      <div class="bg-[#161A22] border border-[#242C38] rounded-xl overflow-hidden shadow-xl">
+        <div class="px-6 py-4 border-b border-[#242C38] flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Ksatria Sedang Bertualang</span>
+            <span class="bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/30 text-[10px] font-mono px-2 py-0.5 rounded-full" x-text="players.length + ' ONLINE'"></span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-[#0F1115] text-[#94A3B8] border-b border-[#242C38]">
+              <tr>
+                <th class="px-6 py-3 font-normal">AVATAR</th>
+                <th class="px-6 py-3 font-normal">KARAKTER</th>
+                <th class="px-6 py-3 font-normal">STEAM ID</th>
+                <th class="px-6 py-3 font-normal">STATUS</th>
+                <th class="px-6 py-3 font-normal">PING</th>
+                <th class="px-6 py-3 font-normal text-right">AKSI</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#242C38]">
+              <template x-for="p in players" :key="p.character_name">
+                <tr class="hover:bg-[#0F1115]/30 transition">
+                  <td class="px-6 py-3.5">
+                    <div class="w-7 h-7 rounded-full bg-[#D97706]/20 border border-[#D97706]/40 text-[#D97706] flex items-center justify-center font-bold text-xs" x-text="p.character_name.charAt(0)"></div>
+                  </td>
+                  <td class="px-6 py-3.5 font-bold text-[#F1F5F9]">
+                    <span x-text="p.character_name"></span>
+                    <span x-show="p.is_admin" class="ml-2 text-[10px] bg-[#D97706]/20 text-[#D97706] px-1.5 py-0.5 rounded">ADMIN</span>
+                  </td>
+                  <td class="px-6 py-3.5 text-[#94A3B8]" x-text="p.steam_id"></td>
+                  <td class="px-6 py-3.5 text-[#10B981]" x-text="p.session_duration_str"></td>
+                  <td class="px-6 py-3.5">
+                    <span class="text-[#10B981] bg-[#15302F] px-2 py-0.5 rounded border border-[#10B981]/30" x-text="p.ping"></span>
+                  </td>
+                  <td class="px-6 py-3.5 text-right space-x-2">
+                    <button @click="kickPlayer(p.character_name)" class="text-[#EF4444] hover:underline">Kick</button>
+                    <button @click="banPlayer(p.steam_id)" class="text-[#EF4444] hover:underline">Ban</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="players.length === 0">
+                <td colspan="6" class="px-6 py-8 text-center text-[#94A3B8]">
+                  Tidak ada ksatria yang sedang online di server.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 02 WORLD MODIFIERS -->
+    <!-- ========================================== -->
+    <div x-show="currentTab === 'modifiers'" x-cloak class="space-y-6 max-w-5xl w-full">
+      <div>
+        <h1 class="font-mono text-xl font-bold text-[#F1F5F9]">World Modifiers</h1>
+        <p class="text-xs text-[#94A3B8]">Ubah aturan dunia tanpa sentuh file konfigurasi secara manual</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        
+        <!-- Resource Rate -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Pengali Sumber Daya (Resource Rate)</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="opt in [{id: 'normal', label: '1x Normal'}, {id: '1.5', label: '1.5x'}, {id: 'muchmore', label: '2x MuchMore'}, {id: 'extreme', label: '3x Extreme'}]" :key="opt.id">
+              <button 
+                @click="modifiers.resources = opt.id"
+                class="px-3 py-1.5 rounded-lg text-xs font-mono transition border"
+                :class="modifiers.resources === opt.id ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="opt.label"
+              ></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Portals -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Regulasi Portal (Teleporter)</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="opt in [{id: 'normal', label: 'Normal'}, {id: 'casual', label: 'Casual [Bawa Ore]'}, {id: 'hard', label: 'Hard'}, {id: 'noportals', label: 'No Portals'}]" :key="opt.id">
+              <button 
+                @click="modifiers.portals = opt.id"
+                class="px-3 py-1.5 rounded-lg text-xs font-mono transition border"
+                :class="modifiers.portals === opt.id ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="opt.label"
+              ></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Base Raids -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Serbuan Musuh (Base Raids)</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="opt in [{id: 'none', label: 'None'}, {id: 'muchless', label: 'MuchLess'}, {id: 'playerevents', label: 'PlayerEvents [Aman]'}, {id: 'normal', label: 'Normal'}, {id: 'muchmore', label: 'MuchMore'}]" :key="opt.id">
+              <button 
+                @click="modifiers.raids = opt.id"
+                class="px-3 py-1.5 rounded-lg text-xs font-mono transition border"
+                :class="modifiers.raids === opt.id ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="opt.label"
+              ></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Combat Difficulty -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Tingkat Kesulitan Pertempuran</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="opt in [{id: 'veryeasy', label: 'Very Easy'}, {id: 'easy', label: 'Easy'}, {id: 'normal', label: 'Normal'}, {id: 'hard', label: 'Hard'}, {id: 'veryhard', label: 'Very Hard'}]" :key="opt.id">
+              <button 
+                @click="modifiers.combat = opt.id"
+                class="px-3 py-1.5 rounded-lg text-xs font-mono transition border"
+                :class="modifiers.combat === opt.id ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="opt.label"
+              ></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Death Penalty -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Hukuman Kematian (Death Penalty)</div>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="opt in [{id: 'casual', label: 'Casual (Item Nempel)'}, {id: 'normal', label: 'Normal (Makam)'}, {id: 'hard', label: 'Hard'}, {id: 'hardcore', label: 'Hardcore'}]" :key="opt.id">
+              <button 
+                @click="modifiers.death_penalty = opt.id"
+                class="px-3 py-1.5 rounded-lg text-xs font-mono transition border"
+                :class="modifiers.death_penalty === opt.id ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="opt.label"
+              ></button>
+            </template>
+          </div>
+        </div>
+
+        <!-- Presets -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-3">
+          <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Preset Cepat (One-Click)</div>
+          <div class="flex flex-wrap gap-2">
+            <button @click="applyPreset('casual')" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-[#0F1115] border border-[#D97706] text-[#D97706] hover:bg-[#D97706]/10 transition">Casual Thorpedo</button>
+            <button @click="applyPreset('vanilla')" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-[#0F1115] border border-[#242C38] text-[#94A3B8] hover:text-[#F1F5F9] transition">Vanilla Murni</button>
+            <button @click="applyPreset('hardcore')" class="px-3 py-1.5 rounded-lg text-xs font-mono bg-[#0F1115] border border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444]/10 transition">Hardcore Viking</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Action Bar -->
+      <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="text-xs text-[#94A3B8] font-mono">
+          * Perubahan modifier dunia akan aktif secara penuh setelah restart server berikutnya.
+        </div>
+        <div class="flex items-center gap-3">
+          <button 
+            @click="saveModifiers(false)" 
+            class="px-4 py-2 rounded-lg text-xs font-mono bg-[#0F1115] border border-[#242C38] hover:bg-[#242C38] text-[#F1F5F9] transition"
+          >
+            Simpan Pengaturan
+          </button>
+          <button 
+            @click="saveModifiers(true)" 
+            class="px-4 py-2 rounded-lg text-xs font-mono bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-bold transition shadow-lg shadow-[#D97706]/10"
+          >
+            Simpan & Restart Sekarang
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 03 SNAPSHOTS & ROLLBACK -->
+    <!-- ========================================== -->
+    <div x-show="currentTab === 'snapshots'" x-cloak class="space-y-6 max-w-5xl w-full">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="font-mono text-xl font-bold text-[#F1F5F9]">Snapshots & Rollback</h1>
+          <p class="text-xs text-[#94A3B8]">Maju-mundur ke titik waktu mana pun dengan proteksi auto-backup</p>
+        </div>
+        <button 
+          @click="createSnapshot()" 
+          :disabled="loadingSnapshot"
+          class="bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-mono font-bold text-xs px-4 py-2.5 rounded-lg transition flex items-center gap-2 shadow-lg shadow-[#D97706]/10"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span>Buat Snapshot Sekarang</span>
+        </button>
+      </div>
+
+      <!-- Snapshot Table -->
+      <div class="bg-[#161A22] border border-[#242C38] rounded-xl overflow-hidden shadow-xl">
+        <table class="w-full text-left text-xs font-mono">
+          <thead class="bg-[#0F1115] text-[#94A3B8] border-b border-[#242C38]">
+            <tr>
+              <th class="px-6 py-3 font-normal">WAKTU (WIB)</th>
+              <th class="px-6 py-3 font-normal">TAG IDENTITAS</th>
+              <th class="px-6 py-3 font-normal">UKURAN</th>
+              <th class="px-6 py-3 font-normal">LOKASI</th>
+              <th class="px-6 py-3 font-normal text-right">AKSI</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#242C38]">
+            <template x-for="s in snapshots" :key="s.id">
+              <tr class="hover:bg-[#0F1115]/30 transition">
+                <td class="px-6 py-3.5 text-[#F1F5F9]" x-text="s.timestamp"></td>
+                <td class="px-6 py-3.5 text-[#D97706]" x-text="s.tag"></td>
+                <td class="px-6 py-3.5 text-[#94A3B8]" x-text="s.size_mb + ' MB'"></td>
+                <td class="px-6 py-3.5">
+                  <span class="bg-[#0F1115] text-[#94A3B8] border border-[#242C38] px-2 py-0.5 rounded text-[10px]" x-text="s.location"></span>
+                </td>
+                <td class="px-6 py-3.5 text-right space-x-3">
+                  <a x-show="s.url" :href="s.url" target="_blank" class="text-[#D97706] hover:underline">Download</a>
+                  <button @click="openRollback(s)" class="text-[#EF4444] hover:underline font-bold">Rollback ke Titik Ini</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="snapshots.length === 0">
+              <td colspan="5" class="px-6 py-8 text-center text-[#94A3B8]">
+                Belum ada snapshot yang tersimpan.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 04 MOD MANAGER -->
+    <!-- ========================================== -->
+    <div x-show="currentTab === 'mods'" x-cloak class="space-y-6 max-w-5xl w-full">
+      <div>
+        <h1 class="font-mono text-xl font-bold text-[#F1F5F9]">Mod Manager</h1>
+        <p class="text-xs text-[#94A3B8]">BepInEx: kontrol mod sisi server dan editor konfigurasi</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: Mod List & Dropzone (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <!-- Dropzone -->
+          <div class="bg-[#161A22] border-2 border-dashed border-[#242C38] hover:border-[#D97706]/50 rounded-xl p-6 text-center cursor-pointer transition">
+            <svg class="w-8 h-8 mx-auto text-[#94A3B8] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <div class="text-sm font-semibold text-[#F1F5F9]">Jatuhkan berkas .dll mod di sini</div>
+            <div class="text-xs text-[#94A3B8] mt-1">Format BepInEx dari Thunderstore (Pure Server-Side)</div>
+          </div>
+
+          <!-- Mod Items -->
+          <div class="space-y-2.5">
+            <template x-for="m in mods" :key="m.filename">
+              <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-4 flex items-center justify-between gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-sm text-[#F1F5F9]" x-text="m.name"></span>
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                          :class="m.enabled ? 'bg-[#15302F] border-[#10B981]/40 text-[#10B981]' : 'bg-[#3B1215] border-[#EF4444]/40 text-[#EF4444]'"
+                          x-text="m.enabled ? 'AKTIF' : 'NONAKTIF'"></span>
+                  </div>
+                  <p class="text-xs text-[#94A3B8] mt-1" x-text="m.description"></p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                  <button 
+                    @click="toggleMod(m)" 
+                    class="px-3 py-1.5 rounded-lg text-xs font-mono border transition"
+                    :class="m.enabled ? 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/30 hover:bg-[#EF4444]/20' : 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30 hover:bg-[#10B981]/20'"
+                    x-text="m.enabled ? 'Nonaktifkan' : 'Aktifkan'"
+                  ></button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Right: Config Editor (5 cols) -->
+        <div class="lg:col-span-5 bg-[#161A22] border border-[#242C38] rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-xs uppercase tracking-wider text-[#94A3B8] mb-3">Editor Konfigurasi In-Game</div>
+            <div class="text-xs text-[#F1F5F9] font-mono mb-2">scheduledmessages.cfg</div>
+            <textarea 
+              rows="12" 
+              class="w-full bg-[#0F1115] border border-[#242C38] rounded-lg p-3 text-xs font-mono text-[#F1F5F9] focus:outline-none focus:border-[#D97706] resize-none"
+              placeholder="Memuat konfigurasi..."
+            >
+[General]
+# Pesan MotD saat player login
+WelcomeMessage = Selamat datang ksatria di Thorpedo Valheim!
+RestartWarningT10 = Server akan melakukan restorasi alam dalam 10 menit.
+RestartWarningT5 = Peringatan T-5 menit: amankan barang dan kembali ke base!
+RestartWarningT1 = Server reboot dalam 1 menit!
+            </textarea>
+          </div>
+
+          <div class="pt-4 border-t border-[#242C38] flex items-center justify-end gap-3 mt-4">
+            <button class="bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-bold text-xs font-mono px-4 py-2 rounded-lg transition">
+              Simpan Konfigurasi
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 05 PEMAIN & LIVE CONSOLE -->
+    <!-- ========================================== -->
+    <div x-show="currentTab === 'players'" x-cloak class="space-y-6 max-w-5xl w-full">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="font-mono text-xl font-bold text-[#F1F5F9]">Pemain & Live Console</h1>
+          <p class="text-xs text-[#94A3B8]">Kontrol akses admin dan pantau output server real-time</p>
+        </div>
+
+        <!-- Sub Tabs -->
+        <div class="flex items-center gap-2 bg-[#161A22] border border-[#242C38] p-1 rounded-lg">
+          <button 
+            @click="playerSubTab = 'access'" 
+            class="px-3 py-1.5 rounded-md text-xs font-mono transition"
+            :class="playerSubTab === 'access' ? 'bg-[#0F1115] text-[#D97706] font-bold border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9]'"
+          >
+            Daftar Akses
+          </button>
+          <button 
+            @click="playerSubTab = 'console'" 
+            class="px-3 py-1.5 rounded-md text-xs font-mono transition"
+            :class="playerSubTab === 'console' ? 'bg-[#0F1115] text-[#D97706] font-bold border border-[#242C38]' : 'text-[#94A3B8] hover:text-[#F1F5F9]'"
+          >
+            Live Console
+          </button>
+        </div>
+      </div>
+
+      <!-- Sub Tab 1: Access Control -->
+      <div x-show="playerSubTab === 'access'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Admin List -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Admin Server (adminlist.txt)</span>
+            <span class="text-[10px] font-mono text-[#D97706]" x-text="admins.length + ' Akun'"></span>
+          </div>
+
+          <div class="flex gap-2">
+            <input 
+              type="text" 
+              x-model="newAdminId" 
+              placeholder="Steam ID 17 digit..." 
+              class="flex-1 bg-[#0F1115] border border-[#242C38] rounded-lg px-3 py-2 text-xs font-mono text-[#F1F5F9] focus:outline-none focus:border-[#D97706]"
+            />
+            <button @click="addAdmin()" class="bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-bold text-xs font-mono px-3 py-2 rounded-lg transition">Tambah</button>
+          </div>
+
+          <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+            <template x-for="a in admins" :key="a">
+              <div class="bg-[#0F1115] border border-[#242C38] rounded-lg px-3 py-2 flex items-center justify-between text-xs font-mono">
+                <span class="text-[#F1F5F9]" x-text="a"></span>
+                <button @click="removeAdmin(a)" class="text-[#EF4444] hover:underline">Hapus</button>
+              </div>
+            </template>
+            <div x-show="admins.length === 0" class="text-xs text-[#94A3B8] text-center py-4">Belum ada admin terdaftar.</div>
+          </div>
+        </div>
+
+        <!-- Banned List -->
+        <div class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs uppercase tracking-wider text-[#94A3B8]">Daftar Blokir (bannedlist.txt)</span>
+            <span class="text-[10px] font-mono text-[#EF4444]" x-text="banned.length + ' Terblokir'"></span>
+          </div>
+
+          <div class="flex gap-2">
+            <input 
+              type="text" 
+              x-model="newBannedId" 
+              placeholder="Steam ID..." 
+              class="flex-1 bg-[#0F1115] border border-[#242C38] rounded-lg px-3 py-2 text-xs font-mono text-[#F1F5F9] focus:outline-none focus:border-[#EF4444]"
+            />
+            <button @click="addBanned()" class="bg-[#EF4444] hover:bg-[#b91c1c] text-white font-bold text-xs font-mono px-3 py-2 rounded-lg transition">Blokir</button>
+          </div>
+
+          <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+            <template x-for="b in banned" :key="b">
+              <div class="bg-[#0F1115] border border-[#242C38] rounded-lg px-3 py-2 flex items-center justify-between text-xs font-mono">
+                <span class="text-[#F1F5F9]" x-text="b"></span>
+                <button @click="removeBanned(b)" class="text-[#10B981] hover:underline">Buka Blokir</button>
+              </div>
+            </template>
+            <div x-show="banned.length === 0" class="text-xs text-[#94A3B8] text-center py-4">Tidak ada pemain yang diblokir.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub Tab 2: Live Console -->
+      <div x-show="playerSubTab === 'console'" class="bg-[#161A22] border border-[#242C38] rounded-xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <template x-for="cat in [{id: 'all', label: 'Semua Log'}, {id: 'connection', label: 'Koneksi/Lobi'}, {id: 'death', label: 'Kematian'}, {id: 'error', label: 'Error'}]" :key="cat.id">
+              <button 
+                @click="logCategory = cat.id; fetchLogs()" 
+                class="px-3 py-1 rounded-md text-xs font-mono transition border"
+                :class="logCategory === cat.id ? 'bg-[#0F1115] text-[#D97706] border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38] hover:text-[#F1F5F9]'"
+                x-text="cat.label"
+              ></button>
+            </template>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs font-mono text-[#94A3B8]">
+            <input type="checkbox" id="autoscroll" x-model="autoScroll" class="rounded bg-[#0F1115] border-[#242C38] text-[#D97706]">
+            <label for="autoscroll">Auto-scroll</label>
+          </div>
+        </div>
+
+        <!-- Terminal Output -->
+        <div id="terminal-box" class="h-96 bg-[#0F1115] border border-[#242C38] rounded-lg p-4 font-mono text-xs text-[#94A3B8] overflow-y-auto space-y-1">
+          <template x-for="(line, idx) in logs" :key="idx">
+            <div class="leading-relaxed hover:text-[#F1F5F9]" :class="{
+              'text-[#10B981]': line.includes('join') || line.includes('active with') || line.includes('connected'),
+              'text-[#EF4444]': line.includes('Exception') || line.includes('Error') || line.includes('Dispose'),
+              'text-[#D97706]': line.includes('Gjallarhorn') || line.includes('died') || line.includes('killed')
+            }" x-text="line"></div>
+          </template>
+          <div x-show="logs.length === 0" class="text-center py-10 text-[#94A3B8]/50">Menunggu stream log server...</div>
+        </div>
+
+        <!-- Command Input -->
+        <div class="flex gap-2">
+          <input 
+            type="text" 
+            x-model="consoleCmd" 
+            @keydown.enter="sendConsoleCommand()"
+            placeholder="Ketik perintah console Valheim / Devcommands..." 
+            class="flex-1 bg-[#0F1115] border border-[#242C38] rounded-lg px-3.5 py-2.5 text-xs font-mono text-[#F1F5F9] focus:outline-none focus:border-[#D97706]"
+          />
+          <button @click="sendConsoleCommand()" class="bg-[#D97706] hover:bg-[#b45309] text-[#0F1115] font-bold text-xs font-mono px-5 py-2.5 rounded-lg transition">
+            Kirim
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: RESTART SERVER -->
+  <!-- ========================================== -->
+  <div x-show="openRestartModal" x-cloak class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#161A22] border border-[#242C38] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="font-mono text-lg font-bold text-[#F1F5F9]">Restorasi Berencana (Restart)</div>
+      <p class="text-xs text-[#94A3B8]">Pilih durasi hitung mundur peringatan in-game untuk ksatria yang sedang bertualang:</p>
+
+      <div class="grid grid-cols-3 gap-2 py-2">
+        <button @click="restartDelay = 300" class="p-3 rounded-lg border text-xs font-mono text-center" :class="restartDelay === 300 ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38]'">5 Menit (Aman)</button>
+        <button @click="restartDelay = 60" class="p-3 rounded-lg border text-xs font-mono text-center" :class="restartDelay === 60 ? 'bg-[#D97706] text-[#0F1115] font-bold border-[#D97706]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38]'">1 Menit</button>
+        <button @click="restartDelay = 0" class="p-3 rounded-lg border text-xs font-mono text-center" :class="restartDelay === 0 ? 'bg-[#EF4444] text-white font-bold border-[#EF4444]' : 'bg-[#0F1115] text-[#94A3B8] border-[#242C38]'">Instan (--now)</button>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#242C38]">
+        <button @click="openRestartModal = false" class="px-4 py-2 rounded-lg text-xs font-mono text-[#94A3B8] hover:text-[#F1F5F9]">Batal</button>
+        <button @click="confirmRestart()" class="px-4 py-2 rounded-lg text-xs font-mono font-bold bg-[#D97706] hover:bg-[#b45309] text-[#0F1115]">Eksekusi Restart</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CONFIRM ROLLBACK -->
+  <!-- ========================================== -->
+  <div x-show="openRollbackModal" x-cloak class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#161A22] border border-[#EF4444] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="font-mono text-lg font-bold text-[#EF4444]">Konfirmasi Rollback Dunia</div>
+      <p class="text-xs text-[#94A3B8]">
+        Kondisi dunia saat ini akan ditimpa dengan snapshot target:
+        <span class="text-[#F1F5F9] font-mono block mt-1" x-text="targetSnapshot?.tag"></span>
+      </p>
+
+      <div class="bg-[#0F1115] p-3 rounded-lg border border-[#242C38] flex items-center gap-3">
+        <input type="checkbox" id="safetynet" x-model="safetyNet" class="rounded bg-[#161A22] border-[#242C38] text-[#D97706]">
+        <label for="safetynet" class="text-xs text-[#F1F5F9]">Buat snapshot pengaman dari kondisi saat ini sebelum rollback (Safety Net)</label>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-[#242C38]">
+        <button @click="openRollbackModal = false" class="px-4 py-2 rounded-lg text-xs font-mono text-[#94A3B8] hover:text-[#F1F5F9]">Batal</button>
+        <button @click="confirmRollback()" class="px-4 py-2 rounded-lg text-xs font-mono font-bold bg-[#EF4444] hover:bg-[#b91c1c] text-white">Konfirmasi & Muat Ulang</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function panelApp() {
+      return {
+        currentTab: 'dashboard',
+        playerSubTab: 'access',
+        toasts: [],
+        openRestartModal: false,
+        restartDelay: 300,
+        openRollbackModal: false,
+        targetSnapshot: null,
+        safetyNet: true,
+        loadingAction: false,
+        loadingSnapshot: false,
+        
+        server: { status: 'loading', running: false },
+        playfab: { is_active: false, join_code: '------', ip: '103.147.92.251', port: 2456, last_refresh: '' },
+        metrics: { cpu_usage_pct: 0, memory_used_gb: 0, memory_total_gb: 0, disk_free_gb: 0 },
+        players: [],
+        modifiers: { resources: 'muchmore', portals: 'casual', raids: 'playerevents', combat: 'normal', death_penalty: 'normal' },
+        snapshots: [],
+        mods: [],
+        admins: [],
+        banned: [],
+        newAdminId: '',
+        newBannedId: '',
+        logs: [],
+        logCategory: 'all',
+        autoScroll: true,
+        consoleCmd: '',
+
+        init() {
+          this.fetchStatus();
+          this.fetchModifiers();
+          this.fetchSnapshots();
+          this.fetchMods();
+          this.fetchPlayers();
+          this.fetchLogs();
+
+          setInterval(() => {
+            this.fetchStatus();
+            if (this.currentTab === 'players' && this.playerSubTab === 'console') {
+              this.fetchLogs();
+            }
+          }, 3500);
+        },
+
+        showToast(message, type = 'success') {
+          const id = Date.now();
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 3000);
+        },
+
+        async copyToClipboard(text, msg) {
+          if (!text || text === '------') return;
+          await navigator.clipboard.writeText(text);
+          this.showToast(msg);
+        },
+
+        async fetchStatus() {
+          try {
+            const res = await fetch('/api/status');
+            if (res.status === 401) window.location.href = '/login';
+            const data = await res.json();
+            this.server = data.server || this.server;
+            this.playfab = data.playfab || this.playfab;
+            this.metrics = data.metrics || this.metrics;
+            this.players = data.players || [];
+          } catch (e) {
+            console.error(e);
+          }
+        },
+
+        async fetchModifiers() {
+          try {
+            const res = await fetch('/api/modifiers');
+            if (res.ok) this.modifiers = await res.json();
+          } catch (e) { console.error(e); }
+        },
+
+        async saveModifiers(restart) {
+          try {
+            const res = await fetch('/api/modifiers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ modifiers: this.modifiers, restart: restart })
+            });
+            const data = await res.json();
+            this.showToast(data.message || 'Modifier berhasil disimpan!');
+          } catch (e) { this.showToast('Gagal simpan modifier', 'error'); }
+        },
+
+        applyPreset(preset) {
+          if (preset === 'casual') {
+            this.modifiers = { resources: 'muchmore', portals: 'casual', raids: 'playerevents', combat: 'normal', death_penalty: 'casual' };
+          } else if (preset === 'vanilla') {
+            this.modifiers = { resources: 'normal', portals: 'normal', raids: 'normal', combat: 'normal', death_penalty: 'normal' };
+          } else if (preset === 'hardcore') {
+            this.modifiers = { resources: 'normal', portals: 'noportals', raids: 'muchmore', combat: 'hard', death_penalty: 'hardcore' };
+          }
+          this.showToast('Preset ' + preset + ' dipilih.');
+        },
+
+        async fetchSnapshots() {
+          try {
+            const res = await fetch('/api/snapshots');
+            if (res.ok) this.snapshots = await res.json();
+          } catch (e) { console.error(e); }
+        },
+
+        async createSnapshot() {
+          this.loadingSnapshot = true;
+          this.showToast('Sedang membuat snapshot dunia...', 'warning');
+          try {
+            const res = await fetch('/api/snapshots/create', { method: 'POST' });
+            const data = await res.json();
+            this.showToast(data.message || 'Snapshot berhasil dibuat!');
+            this.fetchSnapshots();
+          } catch (e) { this.showToast('Gagal buat snapshot', 'error'); }
+          finally { this.loadingSnapshot = false; }
+        },
+
+        openRollback(snap) {
+          this.targetSnapshot = snap;
+          this.openRollbackModal = true;
+        },
+
+        async confirmRollback() {
+          this.openRollbackModal = false;
+          this.showToast('Memulai rollback dunia...', 'warning');
+          try {
+            const res = await fetch('/api/snapshots/rollback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ snapshot_id: this.targetSnapshot.id, safety_net: this.safetyNet })
+            });
+            const data = await res.json();
+            this.showToast(data.message);
+          } catch (e) { this.showToast('Rollback gagal', 'error'); }
+        },
+
+        async fetchMods() {
+          try {
+            const res = await fetch('/api/mods');
+            if (res.ok) this.mods = await res.json();
+          } catch (e) { console.error(e); }
+        },
+
+        async toggleMod(mod) {
+          try {
+            const res = await fetch('/api/mods/toggle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: mod.filename, enable: !mod.enabled })
+            });
+            const data = await res.json();
+            this.showToast(data.message);
+            this.fetchMods();
+          } catch (e) { this.showToast('Gagal ubah status mod', 'error'); }
+        },
+
+        async fetchPlayers() {
+          try {
+            const res = await fetch('/api/players');
+            if (res.ok) {
+              const data = await res.json();
+              this.admins = data.admins || [];
+              this.banned = data.banned || [];
+            }
+          } catch (e) { console.error(e); }
+        },
+
+        async addAdmin() {
+          if (!this.newAdminId.trim()) return;
+          try {
+            const res = await fetch('/api/players/admin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ steam_id: this.newAdminId.trim() })
+            });
+            this.newAdminId = '';
+            this.fetchPlayers();
+            this.showToast('Admin berhasil ditambahkan');
+          } catch (e) { this.showToast('Gagal tambah admin', 'error'); }
+        },
+
+        async removeAdmin(id) {
+          try {
+            await fetch('/api/players/admin', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ steam_id: id })
+            });
+            this.fetchPlayers();
+            this.showToast('Admin dihapus');
+          } catch (e) { this.showToast('Gagal hapus admin', 'error'); }
+        },
+
+        async addBanned() {
+          if (!this.newBannedId.trim()) return;
+          try {
+            await fetch('/api/players/ban', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ steam_id: this.newBannedId.trim() })
+            });
+            this.newBannedId = '';
+            this.fetchPlayers();
+            this.showToast('Pemain diblokir');
+          } catch (e) { this.showToast('Gagal blokir', 'error'); }
+        },
+
+        async removeBanned(id) {
+          try {
+            await fetch('/api/players/ban', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ steam_id: id })
+            });
+            this.fetchPlayers();
+            this.showToast('Blokir dibuka');
+          } catch (e) { this.showToast('Gagal buka blokir', 'error'); }
+        },
+
+        async fetchLogs() {
+          try {
+            const res = await fetch('/api/console/logs?category=' + this.logCategory);
+            if (res.ok) {
+              this.logs = await res.json();
+              if (this.autoScroll) {
+                this.$nextTick(() => {
+                  const box = document.getElementById('terminal-box');
+                  if (box) box.scrollTop = box.scrollHeight;
+                });
+              }
+            }
+          } catch (e) { console.error(e); }
+        },
+
+        async sendConsoleCommand() {
+          if (!this.consoleCmd.trim()) return;
+          const cmd = this.consoleCmd.trim();
+          this.consoleCmd = '';
+          try {
+            const res = await fetch('/api/console/command', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ command: cmd })
+            });
+            const data = await res.json();
+            this.showToast(data.message || 'Perintah dieksekusi');
+            this.fetchLogs();
+          } catch (e) { this.showToast('Gagal kirim perintah', 'error'); }
+        },
+
+        async executeAction(action) {
+          this.loadingAction = true;
+          try {
+            const res = await fetch('/api/actions/execute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: action })
+            });
+            const data = await res.json();
+            this.showToast(data.message || 'Aksi dieksekusi');
+            this.fetchStatus();
+          } catch (e) { this.showToast('Aksi gagal', 'error'); }
+          finally { this.loadingAction = false; }
+        },
+
+        confirmRestart() {
+          this.openRestartModal = false;
+          this.showToast('Memulai restart (' + (this.restartDelay ? this.restartDelay + 's' : 'instan') + ')...', 'warning');
+          fetch('/api/actions/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'restart', delay: this.restartDelay })
+          });
+        }
+      };
+    }
+  </script>
+
+</body>
+</html>

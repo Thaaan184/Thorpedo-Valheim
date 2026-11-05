@@ -9,6 +9,11 @@ logs/
 __pycache__/
 *.pyc
 
+# Panel credentials & sessions
+panel/credentials.json
+panel/.secret_key
+panel/__pycache__/
+
 # OS & Editor
 .DS_Store
 Thumbs.db
