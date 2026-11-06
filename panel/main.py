@@ -1,6 +1,6 @@
 import os
 import sys
-from fastapi import FastAPI, Request, Response, Form, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Response, Form, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -12,10 +12,12 @@ from auth import (
     get_admin_user,
     create_session_token,
     verify_session_token,
-    init_credentials
+    init_credentials,
+    update_admin_password
 )
 from engine_manager import GameServerManager
 import services
+import settings_manager
 
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() == "true"
 PANEL_PORT = int(os.getenv("PANEL_PORT", "28456"))
@@ -77,7 +79,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
             samesite="lax"
         )
         return response
-    return templates.TemplateResponse(request=request, name="login.html", context={"error": "Username atau password salah!"})
+    return templates.TemplateResponse(request=request, name="login.html", context={"error": "Username or password incorrect!"})
 
 @app.get("/logout")
 async def logout():
@@ -94,7 +96,7 @@ async def dashboard_page(request: Request):
         return RedirectResponse(url="/login", status_code=302)
     return templates.TemplateResponse(request=request, name="index.html", context={"user": user or "admin"})
 
-# --- API ENDPOINTS (PROTECTED / CLOUDFLARE ACCESS) ---
+# --- API ENDPOINTS ---
 
 @app.get("/api/status")
 async def get_status(user: str = Depends(require_auth)):
@@ -128,11 +130,43 @@ class ModifiersPayload(BaseModel):
 async def save_modifiers(payload: ModifiersPayload, user: str = Depends(require_auth)):
     success = services.save_modifiers(payload.modifiers)
     if not success:
-        return JSONResponse(status_code=500, content={"message": "Gagal menyimpan file konfigurasi .env"})
-    msg = "Pengaturan modifier dunia berhasil disimpan!"
+        return JSONResponse(status_code=500, content={"message": "Failed to write modifiers to environment."})
+    msg = "World modifiers saved successfully!"
     if payload.restart:
         services.execute_server_action("restart_graceful", delay=0)
-        msg += " Server sedang direstart untuk menerapkan perubahan."
+        msg += " Game server is restarting to apply changes."
+    return {"success": True, "message": msg}
+
+class ServerConfigPayload(BaseModel):
+    name: Optional[str] = None
+    password: Optional[str] = None
+    auto_backup_enabled: Optional[bool] = None
+    auto_backup_interval_hours: Optional[int] = None
+    retention_count: Optional[int] = None
+    restart: Optional[bool] = False
+
+@app.post("/api/server/config")
+async def save_server_config(payload: ServerConfigPayload, user: str = Depends(require_auth)):
+    settings = settings_manager.load_settings()
+    srv = settings.setdefault("server", {})
+    if payload.name is not None:
+        srv["name"] = payload.name
+    if payload.password is not None:
+        srv["password"] = payload.password
+    if payload.auto_backup_enabled is not None:
+        srv["auto_backup_enabled"] = payload.auto_backup_enabled
+    if payload.auto_backup_interval_hours is not None:
+        srv["auto_backup_interval_hours"] = payload.auto_backup_interval_hours
+    if payload.retention_count is not None:
+        srv["retention_count"] = payload.retention_count
+
+    settings_manager.save_settings(settings)
+    settings_manager.update_server_env(payload.name, payload.password)
+
+    msg = "Server configuration updated!"
+    if payload.restart:
+        services.execute_server_action("restart_graceful", delay=0)
+        msg += " Server is rebooting to load updated configuration."
     return {"success": True, "message": msg}
 
 @app.get("/api/snapshots")
@@ -148,7 +182,7 @@ async def create_snapshot_api(user: str = Depends(require_auth)):
 async def download_snapshot(filename: str, user: str = Depends(require_auth)):
     file_path = os.path.join(services.BACKUPS_DIR, filename)
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File snapshot tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Snapshot archive not found")
     return FileResponse(file_path, filename=filename, media_type="application/zip")
 
 class RollbackPayload(BaseModel):
@@ -160,6 +194,13 @@ class RollbackPayload(BaseModel):
 async def rollback(payload: RollbackPayload, user: str = Depends(require_auth)):
     target_id = payload.id or payload.snapshot_id or "latest"
     res = services.rollback_snapshot(target_id, safety=payload.safety if payload.safety is not None else True)
+    return res
+
+@app.post("/api/snapshots/upload-world")
+async def upload_world_api(file: UploadFile = File(...), user: str = Depends(require_auth)):
+    contents = await file.read()
+    fname = file.filename or "uploaded_world.zip"
+    res = services.upload_world_save(fname, contents)
     return res
 
 @app.get("/api/mods")
@@ -174,6 +215,13 @@ class ToggleModPayload(BaseModel):
 async def toggle_mod(payload: ToggleModPayload, user: str = Depends(require_auth)):
     success = services.toggle_mod(payload.name, payload.enable)
     return {"success": success}
+
+@app.post("/api/mods/upload")
+async def upload_mod_api(file: UploadFile = File(...), user: str = Depends(require_auth)):
+    contents = await file.read()
+    fname = file.filename or "uploaded_mod.dll"
+    res = services.upload_mod(fname, contents)
+    return res
 
 @app.get("/api/players")
 async def get_players_data(user: str = Depends(require_auth)):
@@ -212,7 +260,84 @@ class CommandPayload(BaseModel):
 async def send_command(payload: CommandPayload, user: str = Depends(require_auth)):
     mgr = GameServerManager.get_instance()
     success = mgr.send_command(payload.command)
-    return {"success": success, "message": f"Perintah '{payload.command}' terkirim ke engine."}
+    return {"success": success, "message": f"Command '{payload.command}' delivered to engine."}
+
+# --- SETTINGS ENDPOINTS ---
+
+@app.get("/api/settings")
+async def get_settings_api(user: str = Depends(require_auth)):
+    return settings_manager.get_sanitized_settings()
+
+@app.post("/api/settings")
+async def update_settings_api(payload: Dict[str, Any], user: str = Depends(require_auth)):
+    existing = settings_manager.load_settings()
+    
+    # Check github token mask
+    new_gh = payload.get("github", {})
+    if new_gh.get("token") and "..." in new_gh["token"]:
+        new_gh["token"] = existing.get("github", {}).get("token", "")
+        
+    # Check discord webhooks
+    new_whs = payload.get("discord_webhooks", [])
+    exist_wh_map = {w.get("id"): w for w in existing.get("discord_webhooks", [])}
+    for wh in new_whs:
+        if wh.get("url") and "..." in wh["url"]:
+            old_w = exist_wh_map.get(wh.get("id"))
+            if old_w:
+                wh["url"] = old_w.get("url", "")
+
+    existing.update(payload)
+    success = settings_manager.save_settings(existing)
+    
+    if payload.get("server"):
+        srv = payload["server"]
+        settings_manager.update_server_env(srv.get("name"), srv.get("password"))
+
+    return {"ok": success, "message": "Settings updated successfully."}
+
+class DiscordTestPayload(BaseModel):
+    url: str
+    mention_role: Optional[str] = ""
+    embed_color: Optional[str] = "#D97706"
+
+@app.post("/api/settings/discord/test")
+async def test_discord_api(payload: DiscordTestPayload, user: str = Depends(require_auth)):
+    url = payload.url
+    if "..." in url:
+        settings = settings_manager.load_settings()
+        for wh in settings.get("discord_webhooks", []):
+            if wh.get("url") and wh["url"].startswith(url[:15]):
+                url = wh["url"]
+                break
+    res = settings_manager.test_discord_webhook(url, payload.mention_role or "", payload.embed_color or "#D97706")
+    return res
+
+class GitHubTestPayload(BaseModel):
+    repo: str
+    token: str
+
+@app.post("/api/settings/github/test")
+async def test_github_api(payload: GitHubTestPayload, user: str = Depends(require_auth)):
+    tok = payload.token
+    if "..." in tok or not tok:
+        settings = settings_manager.load_settings()
+        tok = settings.get("github", {}).get("token", "")
+    res = settings_manager.test_github_token(payload.repo, tok)
+    return res
+
+class PasswordChangePayload(BaseModel):
+    current_password: str
+    new_password: str
+
+@app.post("/api/settings/password")
+async def change_password_api(payload: PasswordChangePayload, user: str = Depends(require_auth)):
+    admin = get_admin_user()
+    if not verify_password(payload.current_password, admin["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password incorrect.")
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+    update_admin_password(payload.new_password)
+    return {"ok": True, "message": "Admin password changed successfully."}
 
 if __name__ == "__main__":
     import uvicorn

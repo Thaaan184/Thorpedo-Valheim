@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 import pytest
 from fastapi.testclient import TestClient
 
@@ -22,7 +23,6 @@ def test_unauthenticated_api_returns_401():
     assert res.status_code == 401
 
 def test_login_flow():
-    # Login submit
     res = client.post("/login", data={"username": "admin", "password": "ThorpedoAdmin2026!"}, follow_redirects=False)
     assert res.status_code == 302
     assert "thorpedo_session" in res.cookies
@@ -42,6 +42,7 @@ def test_api_status_structure(auth_client):
     assert "status" in data["server"]
     assert "cpu_usage_pct" in data["server"]
     assert "memory_used_mb" in data["server"]
+    assert "password" in data["server"]
     assert "join_code" in data["playfab"]
 
 def test_api_action_execute_graceful(auth_client):
@@ -67,16 +68,62 @@ def test_api_console_command(auth_client):
     assert data["success"] is True
 
 def test_api_players_endpoints(auth_client):
-    # Add admin
     res = auth_client.post("/api/players/admin", json={"steam_id": "76561199999999999"})
     assert res.status_code == 200
     
-    # List players
     res = auth_client.get("/api/players")
     assert res.status_code == 200
     data = res.json()
     assert "76561199999999999" in data["admins"]
     
-    # Remove admin
     res = auth_client.request("DELETE", "/api/players/admin", json={"steam_id": "76561199999999999"})
     assert res.status_code == 200
+
+def test_api_settings_endpoints(auth_client):
+    # Get settings
+    res = auth_client.get("/api/settings")
+    assert res.status_code == 200
+    data = res.json()
+    assert "server" in data
+    assert "discord_webhooks" in data
+    assert "github" in data
+
+    # Update settings
+    payload = {
+        "server": {
+            "name": "BarudakTestServer",
+            "password": "testpassword123",
+            "auto_backup_enabled": True,
+            "auto_backup_interval_hours": 12,
+            "retention_count": 15
+        }
+    }
+    res = auth_client.post("/api/settings", json=payload)
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+
+def test_api_server_config(auth_client):
+    res = auth_client.post("/api/server/config", json={
+        "name": "BarudakViking",
+        "password": "barudaksecret",
+        "auto_backup_enabled": True,
+        "auto_backup_interval_hours": 6,
+        "retention_count": 10,
+        "restart": False
+    })
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+
+def test_api_upload_mod(auth_client):
+    fake_dll = io.BytesIO(b"MZTestDllBinaryMock")
+    files = {"file": ("TestMod.dll", fake_dll, "application/octet-stream")}
+    res = auth_client.post("/api/mods/upload", files=files)
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+
+def test_api_upload_world(auth_client):
+    fake_db = io.BytesIO(b"ValheimWorldDbMockData")
+    files = {"file": ("TestWorld.db", fake_db, "application/octet-stream")}
+    res = auth_client.post("/api/snapshots/upload-world", files=files)
+    assert res.status_code == 200
+    assert res.json()["ok"] is True

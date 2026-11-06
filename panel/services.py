@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 from engine_manager import GameServerManager
+import settings_manager
 
 # Detect host vs container environment
 DATA_DIR = os.getenv("SAVE_DIR", "/config" if os.path.exists("/config") else os.path.abspath(os.path.join(os.path.dirname(__file__), "../data")))
@@ -38,8 +39,6 @@ BANNED_FILE = os.path.join(DATA_DIR, "bannedlist.txt")
 BACKUPS_DIR = os.path.join(DATA_DIR, "backups")
 os.makedirs(BACKUPS_DIR, exist_ok=True)
 
-WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
-
 def get_manager() -> GameServerManager:
     return GameServerManager.get_instance()
 
@@ -62,6 +61,17 @@ def get_full_status() -> Dict[str, Any]:
     sys_m = get_system_metrics()
     status_data["server"]["memory_total_mb"] = sys_m["memory_total_mb"]
     status_data["server"]["disk_free_gb"] = sys_m["disk_free_gb"]
+
+    # Provide server configuration for overview & management
+    settings = settings_manager.load_settings()
+    server_conf = settings.get("server", {})
+    status_data["server"]["name"] = server_conf.get("name", os.getenv("SERVER_NAME", "BarudakValheim"))
+    status_data["server"]["password"] = server_conf.get("password", os.getenv("SERVER_PASS", "barudak123"))
+    status_data["server"]["world_name"] = server_conf.get("world_name", os.getenv("WORLD_NAME", "BarudakValheim"))
+    status_data["server"]["auto_backup_enabled"] = server_conf.get("auto_backup_enabled", True)
+    status_data["server"]["auto_backup_interval_hours"] = server_conf.get("auto_backup_interval_hours", 6)
+    status_data["server"]["retention_count"] = server_conf.get("retention_count", 10)
+
     return status_data
 
 def get_modifiers() -> Dict[str, str]:
@@ -146,12 +156,14 @@ def get_snapshots() -> List[List[Any]]:
     for b in sorted(local_backups, key=os.path.getmtime, reverse=True):
         fname = os.path.basename(b)
         size_mb = round(os.path.getsize(b) / (1024**2), 2)
-        mtime = time.strftime("%d %b %H:%M", time.localtime(os.path.getmtime(b)))
+        mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(b)))
         snaps.append([fname, mtime, size_mb, "LOKAL"])
 
     # 2. GitHub Releases
-    token = os.getenv("GITHUB_TOKEN")
-    repo = os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
+    settings = settings_manager.load_settings()
+    gh = settings.get("github", {})
+    token = gh.get("token") or os.getenv("GITHUB_TOKEN")
+    repo = gh.get("repo") or os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
     try:
         headers = {"Accept": "application/vnd.github.v3+json"}
         if token and not token.startswith("your_"):
@@ -169,9 +181,21 @@ def get_snapshots() -> List[List[Any]]:
         pass
 
     if not snaps:
-        snaps.append(["snapshot-initial", time.strftime("%d %b %H:%M"), 8.22, "LOKAL"])
+        snaps.append(["snapshot-initial", time.strftime("%Y-%m-%d %H:%M"), 8.22, "LOKAL"])
 
     return snaps
+
+def clean_old_snapshots(retention_count: int):
+    if retention_count <= 0:
+        return
+    local_backups = sorted(glob.glob(os.path.join(BACKUPS_DIR, "snapshot-*.zip")), key=os.path.getmtime)
+    while len(local_backups) > retention_count:
+        oldest = local_backups.pop(0)
+        try:
+            os.remove(oldest)
+            get_manager()._handle_log_line(f"Pruned old snapshot: {os.path.basename(oldest)}")
+        except Exception:
+            pass
 
 def create_snapshot() -> Dict[str, Any]:
     mgr = get_manager()
@@ -185,7 +209,7 @@ def create_snapshot() -> Dict[str, Any]:
     
     world_dir = os.path.join(DATA_DIR, "worlds_local")
     if not os.path.exists(world_dir):
-        return {"ok": False, "message": f"Direktori world {world_dir} tidak ditemukan."}
+        return {"ok": False, "message": f"World directory {world_dir} not found."}
 
     try:
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
@@ -196,8 +220,14 @@ def create_snapshot() -> Dict[str, Any]:
                     z.write(full_path, rel_path)
         
         size_mb = round(os.path.getsize(out_path) / (1024**2), 2)
-        mtime = time.strftime("%d %b %H:%M")
+        mtime = time.strftime("%Y-%m-%d %H:%M")
         mgr._handle_log_line(f"Snapshot created: {fname} ({size_mb} MB)")
+        
+        # Enforce retention policy
+        settings = settings_manager.load_settings()
+        retention = settings.get("server", {}).get("retention_count", 10)
+        clean_old_snapshots(retention)
+
         return {
             "ok": True,
             "filename": fname,
@@ -206,7 +236,7 @@ def create_snapshot() -> Dict[str, Any]:
             "mtime": mtime
         }
     except Exception as e:
-        return {"ok": False, "message": f"Gagal membuat snapshot: {e}"}
+        return {"ok": False, "message": f"Failed to create snapshot: {e}"}
 
 def rollback_snapshot(target_id: str, safety: bool = True) -> Dict[str, Any]:
     mgr = get_manager()
@@ -223,28 +253,57 @@ def rollback_snapshot(target_id: str, safety: bool = True) -> Dict[str, Any]:
 
     if not target_file:
         mgr.start()
-        return {"ok": False, "message": f"Snapshot '{target_id}' tidak ditemukan di {BACKUPS_DIR}."}
+        return {"ok": False, "message": f"Snapshot '{target_id}' not found in {BACKUPS_DIR}."}
 
     try:
         with zipfile.ZipFile(target_file, "r") as z:
             z.extractall(DATA_DIR)
-        mgr._handle_log_line(f"World rollback successfully extracted from: {os.path.basename(target_file)}")
+        mgr._handle_log_line(f"World rollback successfully restored from: {os.path.basename(target_file)}")
         mgr.start()
-        return {"ok": True, "message": f"Rollback ke {os.path.basename(target_file)} berhasil."}
+        return {"ok": True, "message": f"Rollback to {os.path.basename(target_file)} succeeded."}
     except Exception as e:
         mgr.start()
-        return {"ok": False, "message": f"Gagal mengekstrak snapshot: {e}"}
+        return {"ok": False, "message": f"Failed to extract snapshot: {e}"}
+
+def upload_world_save(filename: str, file_bytes: bytes) -> Dict[str, Any]:
+    target_dir = os.path.join(DATA_DIR, "worlds_local")
+    os.makedirs(target_dir, exist_ok=True)
+    
+    clean_fn = os.path.basename(filename)
+    if clean_fn.endswith(".db") or clean_fn.endswith(".fwl"):
+        dest = os.path.join(target_dir, clean_fn)
+        with open(dest, "wb") as f:
+            f.write(file_bytes)
+        get_manager()._handle_log_line(f"Uploaded world save file: {clean_fn}")
+        return {"ok": True, "filename": clean_fn, "message": f"World file '{clean_fn}' uploaded successfully."}
+    elif clean_fn.endswith(".zip"):
+        temp_zip = os.path.join(target_dir, f"temp_{clean_fn}")
+        with open(temp_zip, "wb") as f:
+            f.write(file_bytes)
+        try:
+            with zipfile.ZipFile(temp_zip, "r") as z:
+                z.extractall(target_dir)
+            os.remove(temp_zip)
+            get_manager()._handle_log_line(f"Extracted world archive: {clean_fn}")
+            return {"ok": True, "filename": clean_fn, "message": f"World archive '{clean_fn}' extracted to worlds_local."}
+        except Exception as e:
+            if os.path.exists(temp_zip):
+                os.remove(temp_zip)
+            return {"ok": False, "message": f"Failed to extract world zip: {e}"}
+            
+    return {"ok": False, "message": "Invalid file format. Please upload .db, .fwl, or .zip archive."}
 
 def get_installed_mods() -> List[List[Any]]:
     mods = []
     known_info = {
-        "CrossplayJoinCodeFix": ("v1.1.1", "Memperbaiki Join Code untuk crossplay PlayFab"),
-        "Gjallarhorn": ("v0.3.0", "Notifikasi kematian, boss banner, deteksi biome"),
-        "WorkbenchLove": ("v1.0.2", "Perluas radius meja kerja pemain (40m)"),
-        "ScheduledMessages": ("v1.0.0", "Pengumuman otomatis & hitung mundur restart"),
-        "ServerDevcommands": ("v1.0.0", "Perintah admin multiplayer"),
-        "NoCheatFlag": ("v1.0.0", "Pencegah flag cheat item"),
-        "NetworkPerformanceSystem": ("v1.0.0", "Optimasi latensi & paket UDP ZDO")
+        "CrossplayJoinCodeFix": ("v1.1.1", "Crossplay Join Code stability helper"),
+        "Gjallarhorn": ("v0.3.0", "Death announcer, boss banners, biome detection"),
+        "WorkbenchLove": ("v1.0.2", "Expanded workbench radius for builders (40m)"),
+        "ScheduledMessages": ("v1.0.0", "Automated broadcast messages & countdowns"),
+        "ServerDevcommands": ("v1.0.0", "Multiplayer admin command toolkit"),
+        "NoCheatFlag": ("v1.0.0", "Suppresses false positive cheat flags on items"),
+        "NetworkPerformanceSystem": ("v1.0.0", "UDP ZDO compression and lag optimization"),
+        "Jotunn": ("v2.20.0", "The Valheim Modding Library runtime")
     }
 
     if os.path.exists(PLUGINS_DIR):
@@ -253,7 +312,7 @@ def get_installed_mods() -> List[List[Any]]:
             if f.endswith(".dll") or f.endswith(".dll.disabled"):
                 is_enabled = 1 if f.endswith(".dll") else 0
                 clean_name = f.replace(".dll.disabled", "").replace(".dll", "")
-                v, desc = known_info.get(clean_name, ("v1.0.0", "Plugin server BepInEx"))
+                v, desc = known_info.get(clean_name, ("v1.0.0", "Custom BepInEx mod plugin"))
                 mods.append([clean_name, v, desc, is_enabled])
 
     if not mods:
@@ -274,6 +333,33 @@ def toggle_mod(name: str, enable: bool) -> bool:
         os.rename(dll, dis)
         return True
     return False
+
+def upload_mod(filename: str, file_bytes: bytes) -> Dict[str, Any]:
+    os.makedirs(PLUGINS_DIR, exist_ok=True)
+    clean_fn = os.path.basename(filename)
+    
+    if clean_fn.endswith(".dll"):
+        dest = os.path.join(PLUGINS_DIR, clean_fn)
+        with open(dest, "wb") as f:
+            f.write(file_bytes)
+        get_manager()._handle_log_line(f"Installed mod: {clean_fn}")
+        return {"ok": True, "type": "dll", "filename": clean_fn, "message": f"Plugin '{clean_fn}' installed to plugins folder."}
+    elif clean_fn.endswith(".zip"):
+        temp_zip = os.path.join(PLUGINS_DIR, f"temp_{clean_fn}")
+        with open(temp_zip, "wb") as f:
+            f.write(file_bytes)
+        try:
+            with zipfile.ZipFile(temp_zip, "r") as z:
+                z.extractall(PLUGINS_DIR)
+            os.remove(temp_zip)
+            get_manager()._handle_log_line(f"Extracted mod zip archive: {clean_fn}")
+            return {"ok": True, "type": "zip", "filename": clean_fn, "message": f"Archive '{clean_fn}' successfully extracted into plugins."}
+        except Exception as e:
+            if os.path.exists(temp_zip):
+                os.remove(temp_zip)
+            return {"ok": False, "message": f"Failed to extract mod zip: {e}"}
+            
+    return {"ok": False, "message": "Invalid file format. Upload .dll plugin or .zip bundle."}
 
 def get_admin_list() -> List[str]:
     if not os.path.exists(ADMIN_FILE):
@@ -336,74 +422,96 @@ def send_discord_broadcast() -> bool:
     port = status["playfab"]["port"]
     uptime_min = status["server"]["uptime_seconds"] // 60
 
-    if not WEBHOOK_URL:
-        mgr._handle_log_line("Discord webhook URL not configured.")
-        return False
+    settings = settings_manager.load_settings()
+    webhooks = settings.get("discord_webhooks", [])
 
-    payload = {
-        "username": "Thorpedo Valheim Watcher",
-        "avatar_url": "https://raw.githubusercontent.com/reloadlife/valheim-server/main/logo.png",
-        "embeds": [
-            {
-                "title": "⚔️ THORPEDO VALHEIM — STATUS GERBANG",
-                "description": "Lobi PlayFab aktif dan gerbang dunia Valheim terbuka untuk para ksatria!",
-                "color": 14251782,  # Amber #D97706
-                "fields": [
-                    {"name": "🔑 6-Digit Join Code", "value": f"**`{join_code}`**", "inline": True},
-                    {"name": "🛡️ Status Lobi", "value": "🟢 Online & Terdaftar" if is_active else "🔴 Memulai...", "inline": True},
-                    {"name": "⏱️ Uptime", "value": f"{uptime_min} menit", "inline": True},
-                    {"name": "🌐 Direct IP", "value": f"`{ip}:{port}`", "inline": False},
-                    {"name": "📜 Panduan Masuk", "value": "Buka Valheim -> **Join Game** -> **Add Server** -> Masukkan 6-digit Join Code.", "inline": False}
-                ],
-                "footer": {"text": "Thorpedo Autonomous Sentinel • PT Nalar Cerdas Teknologi"}
-            }
-        ]
-    }
-    try:
-        resp = requests.post(WEBHOOK_URL, json=payload, timeout=5)
-        mgr._handle_log_line(f"Discord broadcast sent (HTTP {resp.status_code})")
-        return resp.status_code in [200, 204]
-    except Exception as e:
-        mgr._handle_log_line(f"Failed to send Discord webhook: {e}")
-        return False
+    # If no configured webhooks in settings, fallback to env
+    if not webhooks:
+        legacy_url = os.getenv("DISCORD_WEBHOOK_URL", "")
+        if legacy_url:
+            webhooks = [{"url": legacy_url, "enabled": True, "mention_role": "", "embed_color": "#D97706"}]
+
+    sent_any = False
+    for wh in webhooks:
+        if not wh.get("enabled") or not wh.get("url"):
+            continue
+
+        role = wh.get("mention_role", "").strip()
+        color_hex = wh.get("embed_color", "#D97706")
+        color_int = 14251782
+        try:
+            if color_hex.startswith("#"):
+                color_int = int(color_hex.lstrip("#"), 16)
+        except Exception:
+            pass
+
+        payload = {
+            "username": "Thorpedo Valheim Sentinel",
+            "avatar_url": "https://raw.githubusercontent.com/reloadlife/valheim-server/main/logo.png",
+            "content": f"{role} " if role else None,
+            "embeds": [
+                {
+                    "title": "⚔️ THORPEDO VALHEIM — GATEWAY STATUS",
+                    "description": "PlayFab crossplay lobby is live and world gates are open!",
+                    "color": color_int,
+                    "fields": [
+                        {"name": "🔑 6-Digit Join Code", "value": f"**`{join_code}`**", "inline": True},
+                        {"name": "🛡️ Lobby State", "value": "🟢 Online & Registered" if is_active else "🔴 Initializing...", "inline": True},
+                        {"name": "⏱️ Uptime", "value": f"{uptime_min} mins", "inline": True},
+                        {"name": "🌐 Direct IP", "value": f"`{ip}:{port}`", "inline": False},
+                        {"name": "📜 How to Connect", "value": "Open Valheim -> **Join Game** -> **Add Server** -> Enter 6-digit Join Code.", "inline": False}
+                    ],
+                    "footer": {"text": "Thorpedo Autonomous Sentinel • PT Nalar Cerdas Teknologi"}
+                }
+            ]
+        }
+        try:
+            resp = requests.post(wh["url"], json=payload, timeout=6)
+            if resp.status_code in [200, 204]:
+                sent_any = True
+                mgr._handle_log_line(f"Discord broadcast dispatched to {wh.get('name', 'webhook')} (HTTP {resp.status_code})")
+        except Exception as e:
+            mgr._handle_log_line(f"Failed to post to webhook {wh.get('name')}: {e}")
+
+    return sent_any
 
 def execute_server_action(action: str, delay: int = 0) -> Dict[str, Any]:
     mgr = get_manager()
 
     if action in ["restart_graceful", "restart"]:
         mgr.restart(graceful=True, delay_seconds=delay)
-        return {"ok": True, "executed": action, "message": f"Restart bertahap dijadwalkan (delay: {delay}s)."}
+        return {"ok": True, "executed": action, "message": f"Graceful restart scheduled (delay: {delay}s)."}
 
     elif action in ["restart_force", "kill"]:
         mgr.restart(graceful=False, delay_seconds=0)
-        return {"ok": True, "executed": action, "message": "Kill paksa & restart instan dijalankan."}
+        return {"ok": True, "executed": action, "message": "Force kill & instant restart initiated."}
 
     elif action == "start":
         started = mgr.start()
-        return {"ok": started, "executed": action, "message": "Server game dinyalakan." if started else "Server sudah berjalan."}
+        return {"ok": started, "executed": action, "message": "Game server started." if started else "Server already running."}
 
     elif action == "stop":
         mgr.stop(timeout=15)
-        return {"ok": True, "executed": action, "message": "Server dihentikan."}
+        return {"ok": True, "executed": action, "message": "Server stopped."}
 
     elif action == "force_save":
         mgr.send_command("save")
         mgr._handle_log_line("World flush / save requested from panel.")
-        return {"ok": True, "executed": "force_save", "message": "Dunia berhasil disimpan."}
+        return {"ok": True, "executed": "force_save", "message": "World flushed to disk successfully."}
 
     elif action == "reset_playfab":
         mgr.restart(graceful=True, delay_seconds=0)
-        return {"ok": True, "executed": "reset_playfab", "message": "Reset lobi PlayFab dimulai."}
+        return {"ok": True, "executed": "reset_playfab", "message": "Resetting PlayFab matchmaking socket."}
 
     elif action == "broadcast_discord":
         success = send_discord_broadcast()
-        return {"ok": success, "executed": "broadcast_discord", "message": "Broadcast Join Code dikirim ke Discord!" if success else "Gagal mengirim webhook Discord (cek URL)."}
+        return {"ok": success, "executed": "broadcast_discord", "message": "Broadcast sent to configured Discord webhooks!" if success else "Failed to dispatch webhook (check settings)."}
 
     elif action == "check_playfab":
         st = mgr.get_status()
         is_active = st["playfab"]["is_active"]
         code = st["playfab"]["join_code"]
-        msg = f"Lobi PlayFab TERDAFTAR (Join Code: {code}). Koneksi stabil." if is_active else "Lobi PlayFab BELUM aktif atau sedang memulai."
+        msg = f"PlayFab lobby is REGISTERED (Join Code: {code}). Active and healthy." if is_active else "PlayFab lobby NOT active or currently initializing."
         return {"ok": is_active, "executed": "check_playfab", "message": msg}
 
-    return {"ok": False, "executed": action, "message": f"Aksi '{action}' tidak dikenal."}
+    return {"ok": False, "executed": action, "message": f"Action '{action}' unknown."}

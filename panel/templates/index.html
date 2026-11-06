@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thorpedo · Valheim Control</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thorpedo · Valheim Control</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0F1115;--s:#161A22;--s2:#1B202A;--b:#242C38;--t:#F1F5F9;--m:#94A3B8;--a:#D97706;--ok:#10B981;--w:#F59E0B;--bad:#EF4444;--ice:#0284C7;--mono:'JetBrains Mono',ui-monospace,monospace;color-scheme:dark}
@@ -6,16 +6,18 @@
 #app{display:grid;grid-template-columns:184px 1fr;grid-template-rows:60px 1fr;height:100vh}
 header{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid var(--b);background:var(--s)}
 .brand{font:700 15px var(--mono);letter-spacing:.14em}.sp{flex:1}.mono{font-family:var(--mono)}
-nav{border-right:1px solid var(--b);background:var(--s);padding:12px 0}
-nav a{display:flex;justify-content:space-between;padding:9px 20px;color:var(--m);cursor:pointer;border-left:2px solid transparent}
+nav{border-right:1px solid var(--b);background:var(--s);padding:12px 0;display:flex;flex-direction:column;justify-content:space-between}
+.nav-links{display:flex;flex-direction:column}
+nav a{display:flex;justify-content:space-between;padding:9px 20px;color:var(--m);cursor:pointer;border-left:2px solid transparent;text-decoration:none}
 nav a:hover{color:var(--t)}nav a.on{color:var(--t);border-color:var(--a);background:var(--bg)}nav small{font:11px var(--mono);color:var(--a)}
+.lang-box{padding:12px 16px;border-top:1px solid var(--b)}
 main{overflow:auto;padding:24px 28px 90px;position:relative}
 h2{font:700 11px var(--mono);letter-spacing:.14em;color:var(--m);text-transform:uppercase;display:flex;align-items:center;gap:12px;margin-bottom:12px}h2:after{content:"";flex:1;height:1px;background:var(--b)}
 .chip{display:inline-flex;align-items:center;gap:7px;font:700 11px var(--mono);letter-spacing:.08em;padding:4px 9px;border:1px solid var(--b);border-radius:2px;color:var(--m)}
 .chip i{width:7px;height:7px;border-radius:50%;background:var(--m)}.chip.running{color:var(--ok);border-color:#0e5a43}.chip.running i{background:var(--ok);animation:p 2s infinite}
 .chip.stopped{color:var(--bad);border-color:#6b2327}.chip.stopped i{background:var(--bad)}.chip.rebooting{color:var(--w);border-color:#6b4d10}.chip.rebooting i{background:var(--w);animation:p .7s infinite}
 .chip.bad{color:var(--bad);border-color:#6b2327}@keyframes p{50%{opacity:.25}}
-.btn{font:600 12px Inter,sans-serif;color:var(--t);background:var(--s2);border:1px solid var(--b);border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn{font:600 12px Inter,sans-serif;color:var(--t);background:var(--s2);border:1px solid var(--b);border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn:hover:not(:disabled){border-color:var(--m)}.btn:disabled{opacity:.35;cursor:not-allowed}.btn.p{background:var(--a);border-color:var(--a);color:#14100a}.btn.p:hover:not(:disabled){background:#ea8a12;border-color:#ea8a12}
 .btn.d{color:var(--bad);border-color:#5a2a2e;background:transparent}.btn.d:hover:not(:disabled){background:var(--bad);color:#14100a;border-color:var(--bad)}.btn.g{background:transparent;padding:4px 9px;font-size:11px}.btn.g.d{border-color:var(--b)}
 .split{position:relative;display:flex}.split .btn:first-child{border-radius:3px 0 0 3px}.split .ch{border-radius:0 3px 3px 0;border-left:1px solid #14100a55;padding:7px 9px}
@@ -31,24 +33,113 @@ svg.sl{width:100%;height:26px}.fix{margin-bottom:28px}.fix ol{list-style:none;pa
 .fix .n{font:700 13px var(--mono);color:var(--a);border:1px solid var(--b);width:26px;height:26px;display:grid;place-items:center}.fix p{font-size:12px;color:var(--m)}.fix .res{color:var(--ok);font:12px var(--mono);margin-top:3px}
 table{width:100%;border-collapse:collapse}th{font:700 10px var(--mono);letter-spacing:.12em;color:var(--m);text-align:left;padding:10px 16px;border-bottom:1px solid var(--b);text-transform:uppercase}
 td{padding:11px 16px;border-bottom:1px solid var(--b)}tr:last-child td{border:0}td.r,th.r{text-align:right}td .row{justify-content:flex-end}tr:hover td{background:#ffffff05}
-.tag{font:700 10px var(--mono);letter-spacing:.08em;padding:2px 7px;border:1px solid var(--b);color:var(--m)}.tag.gh{color:var(--ice);border-color:#0b4a6b}.tag.adm{color:var(--a);border-color:#6b3d08}
+.tag{font:700 10px var(--mono);letter-spacing:.08em;padding:2px 7px;border:1px solid var(--b);color:var(--m)}.tag.gh{color:var(--ice);border-color:#0b4a6b}.tag.adm{color:var(--a);border-color:#6b3d08}.tag.ok{color:var(--ok);border-color:#0e5a43}
 .term{background:#0A0C10;border:1px solid var(--b);font:12px/1.75 var(--mono);padding:14px 16px;overflow:auto;height:calc(100vh - 260px);min-height:240px}.term.mini{height:auto;max-height:170px}
 .term div{white-space:pre-wrap}.term .t{color:#4b5563}.INFO{color:var(--m)}.CONN{color:var(--ok)}.DEATH{color:var(--w)}.WARN{color:var(--w)}.ERROR{color:var(--bad)}
 .seg{display:inline-flex;border:1px solid var(--b);border-radius:3px;overflow:hidden}.seg button{background:var(--s);color:var(--m);border:0;border-right:1px solid var(--b);padding:7px 12px;font:12px Inter;cursor:pointer}.seg button:last-child{border:0}.seg button:hover{color:var(--t)}.seg button.on{background:#3a2608;color:var(--a);font-weight:600}
 .cmd{display:flex;margin-top:10px;border:1px solid var(--b);background:#0A0C10}.cmd span{padding:9px 0 0 14px;color:var(--a);font:700 13px var(--mono)}.cmd input{flex:1;background:none;border:0;color:var(--t);font:13px var(--mono);padding:9px 12px;outline:0}.cmd .btn{border:0;border-left:1px solid var(--b);border-radius:0}
 .list{display:flex;flex-direction:column}.list>div{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--b)}.list>div:last-child{border:0}.list small{display:block;color:var(--m);font-size:12px}.list b{font-weight:600}
 .tog{width:36px;height:20px;border-radius:10px;background:var(--b);border:0;position:relative;cursor:pointer}.tog:after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--t);transition:.15s}.tog.on{background:var(--ok)}.tog.on:after{left:19px}
-.bar{position:sticky;bottom:-70px;margin-top:20px;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--s2);border:1px solid #6b4d10;border-left:3px solid var(--w)}
+.bar{position:sticky;bottom:-70px;margin-top:20px;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--s2);border:1px solid #6b4d10;border-left:3px solid var(--w);z-index:10}
 .top2{display:flex;align-items:center;gap:12px;margin-bottom:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}.add{display:flex;gap:8px;padding:14px 16px;border-bottom:1px solid var(--b)}
-input.in{flex:1;background:var(--bg);border:1px solid var(--b);color:var(--t);padding:7px 10px;font:12px var(--mono);border-radius:3px;outline:0}input.in:focus{border-color:var(--a)}
-.ov{position:fixed;inset:0;background:#05060acc;display:grid;place-items:center;z-index:50}.ov[hidden]{display:none}.mod{width:460px;max-width:92vw;background:var(--s);border:1px solid var(--b);padding:22px;display:flex;flex-direction:column;gap:14px}.mod.dng{border-color:#6b2327}.mod h3{font:700 15px var(--mono)}.mod label{display:flex;flex-direction:column;gap:5px;color:var(--m);font-size:12px}
+input.in,select.in,textarea.in{background:var(--bg);border:1px solid var(--b);color:var(--t);padding:7px 10px;font:12px var(--mono);border-radius:3px;outline:0}input.in:focus,select.in:focus,textarea.in:focus{border-color:var(--a)}
+.ov{position:fixed;inset:0;background:#05060acc;display:grid;place-items:center;z-index:50}.ov[hidden]{display:none}.mod{width:520px;max-width:94vw;background:var(--s);border:1px solid var(--b);padding:24px;display:flex;flex-direction:column;gap:16px;max-height:90vh;overflow-y:auto}.mod.dng{border-color:#6b2327}.mod h3{font:700 15px var(--mono)}.mod label{display:flex;flex-direction:column;gap:6px;color:var(--m);font-size:12px}
+.card-grid{display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:28px}
+.card{border:1px solid var(--b);background:var(--s);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.card-head{display:flex;align-items:center;justify-content:space-between}
+.card-head h3{font:700 13px var(--mono);color:var(--t)}
 #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:60}#toast div{background:var(--s2);border:1px solid var(--b);border-left:3px solid var(--ok);padding:10px 14px;font-size:12px}#toast .e{border-left-color:var(--bad)}
 @media(max-width:860px){ #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}header{flex-wrap:wrap;padding:10px 14px}nav{display:flex;overflow:auto;border:0;border-bottom:1px solid var(--b)}nav a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}nav a.on{border-color:var(--a)}.grid,.two{grid-template-columns:1fr}main{padding:16px 14px 90px}.digits i{width:40px;font-size:34px}}
-</style></head><body><div id="app"><header id="hd"></header><nav id="nv"></nav><main id="mn"></main></div>
+</style></head><body><div id="app"><header id="hd"></header><nav id="nv"><div class="nav-links" id="nl"></div><div class="lang-box"><button class="btn g" id="btn-lang" style="width:100%">🌐 Language: EN</button></div></nav><main id="mn"></main></div>
 <div class="ov" id="ov" hidden></div><div id="toast"></div>
+<input type="file" id="file-world" style="display:none" accept=".db,.fwl,.zip">
+<input type="file" id="file-mod" style="display:none" accept=".dll,.zip">
+
 <script>
 const API = '';
 const $ = s => document.querySelector(s);
+
+let LANG = localStorage.getItem('thorpedo_lang') || 'en';
+
+const TXT = {
+  en: {
+    restart: 'Restart', restart1m: 'Restart, 1 min countdown', restart5m: 'Restart, 5 min countdown',
+    forceKill: 'Force Kill & Restart', saveWorld: 'Save World', stop: 'Stop', start: 'Start Server',
+    running: 'RUNNING', stopped: 'STOPPED', rebooting: 'REBOOTING',
+    active: 'ACTIVE', stall: 'STALL', uptime: 'UPTIME', logout: 'Logout',
+    joinCode: 'Join Code', copyCode: 'Copy Code', copyIp: 'Copy IP', copyPass: 'Copy Password',
+    broadcastDiscord: 'Broadcast to Discord', serverPassword: 'Server Password', serverName: 'Server Name',
+    registeredPlayFab: 'Registered on PlayFab', directJoin: 'Direct Join', hostVitals: 'Host Vitals',
+    troubleshootTitle: 'Server Not Visible in Valheim?',
+    step1Title: 'Check PlayFab Lobby', step1Desc: 'Verify if server is registered in Azure matchmaking.', checkBtn: 'Check',
+    step2Title: 'Reset Matchmaking Socket', step2Desc: 'Reopen lobby socket and acquire fresh Join Code.', resetBtn: 'Reset Lobby',
+    step3Title: 'Force Restart', step3Desc: 'If engine is hanging: flush world, kill process and reboot immediately.', killBtn: 'Kill & Restart',
+    onlinePlayers: 'Online Adventurers', charCol: 'Character', steamCol: 'Steam ID', sessionCol: 'Online', pingCol: 'Status', actCol: 'Actions',
+    latestLogs: 'Latest Logs', openConsole: 'Open Console', noPlayers: 'No players currently online.',
+    allLogs: 'All', connLogs: 'Conn/Lobby', deathLogs: 'Death/Events', errLogs: 'Errors/Warnings', clearBtn: 'Clear',
+    cmdPlaceholder: 'Type admin console command and press Enter', sendBtn: 'Send',
+    worldSettings: 'World & Server Settings', serverConfigTitle: 'Server Identity & Automated Backups',
+    srvNameLabel: 'Server Name', srvPassLabel: 'Server Password', autoBackupLabel: 'Automated Backup Engine',
+    backupFreqLabel: 'Backup Frequency', retentionLabel: 'Local Snapshots Retention',
+    saveServerBtn: 'Save Server Config', saveRestartBtn: 'Save & Restart Server',
+    modifiersTitle: 'Gameplay Modifiers', resourceMod: 'Resource Rate', portalMod: 'Portal Rules',
+    raidMod: 'Enemy Raids', combatMod: 'Combat Difficulty', deathMod: 'Death Penalty',
+    saveModsBtn: 'Save Modifiers', unsavedBar: 'changes pending. Active after next server restart.',
+    discardBtn: 'Discard Changes', saveBtn: 'Save',
+    activeWorld: 'Active World', snapshotsCount: 'Snapshots', createSnapBtn: 'Create Snapshot Now',
+    uploadWorldBtn: 'Upload World Save (.db / .fwl / .zip)', timeCol: 'Timestamp', nameCol: 'Name / Tag',
+    sizeCol: 'Size', locCol: 'Storage', downloadBtn: 'Download .zip', rollbackBtn: 'Rollback',
+    noSnaps: 'No snapshots recorded yet.',
+    modsTitle: 'Installed BepInEx Plugins', uploadModBtn: 'Upload Mod (.dll / .zip)',
+    editConfigBtn: 'Edit Config', modRestartNotice: 'Mod toggles and additions take effect after server restart.',
+    settingsTitle: 'System Settings', discordCardTitle: 'Discord Webhook Integration',
+    addWebhookBtn: '+ Add Webhook', githubCardTitle: 'GitHub Cloud Sync & Release Storage',
+    configGithubBtn: 'Configure GitHub', securityCardTitle: 'Admin Security Credentials',
+    changePassBtn: 'Change Password', testBtn: 'Test Connection', saveConfigBtn: 'Save Settings',
+    cancelBtn: 'Cancel', confirmBtn: 'Confirm', copied: 'Copied',
+    tabs: { overview: 'Overview', console: 'Console', world: 'World', players: 'Players', snap: 'Snapshots', mods: 'Mods', settings: 'Settings' }
+  },
+  id: {
+    restart: 'Restart', restart1m: 'Restart, hitung mundur 1m', restart5m: 'Restart, hitung mundur 5m',
+    forceKill: 'Kill Paksa & Restart', saveWorld: 'Simpan Dunia', stop: 'Stop Server', start: 'Start Server',
+    running: 'RUNNING', stopped: 'STOPPED', rebooting: 'REBOOTING',
+    active: 'ACTIVE', stall: 'STALL', uptime: 'UPTIME', logout: 'Keluar',
+    joinCode: 'Join Code', copyCode: 'Salin Kode', copyIp: 'Salin IP', copyPass: 'Salin Password',
+    broadcastDiscord: 'Siarkan ke Discord', serverPassword: 'Password Server', serverName: 'Nama Server',
+    registeredPlayFab: 'Terdaftar di PlayFab', directJoin: 'Direct Join', hostVitals: 'Vitals Host',
+    troubleshootTitle: 'Server Tidak Muncul di Valheim?',
+    step1Title: 'Periksa Lobi PlayFab', step1Desc: 'Cek apakah server masih terdaftar di matchmaking Azure.', checkBtn: 'Periksa',
+    step2Title: 'Reset Lobi', step2Desc: 'Buka ulang socket matchmaking, join code baru dikirim otomatis.', resetBtn: 'Reset Lobi',
+    step3Title: 'Restart Paksa', step3Desc: 'Jika engine hang: simpan dunia, kill proses dan jalankan ulang seketika.', killBtn: 'Kill & Restart',
+    onlinePlayers: 'Pemain Bertualang', charCol: 'Karakter', steamCol: 'Steam ID', sessionCol: 'Online', pingCol: 'Status', actCol: 'Aksi',
+    latestLogs: 'Log Terbaru', openConsole: 'Buka Console', noPlayers: 'Tidak ada pemain online.',
+    allLogs: 'Semua', connLogs: 'Koneksi/Lobi', deathLogs: 'Kematian/Event', errLogs: 'Error/Warning', clearBtn: 'Bersihkan',
+    cmdPlaceholder: 'Ketik perintah admin console lalu Enter', sendBtn: 'Kirim',
+    worldSettings: 'Pengaturan Dunia & Server', serverConfigTitle: 'Identitas Server & Auto-Backup',
+    srvNameLabel: 'Nama Server', srvPassLabel: 'Password Server', autoBackupLabel: 'Auto-Backup Terjadwal',
+    backupFreqLabel: 'Frekuensi Backup', retentionLabel: 'Batas Simpan Snapshot Lokal',
+    saveServerBtn: 'Simpan Konfigurasi Server', saveRestartBtn: 'Simpan & Restart Server',
+    modifiersTitle: 'Modifier Aturan Dunia', resourceMod: 'Pengali Sumber Daya', portalMod: 'Regulasi Portal',
+    raidMod: 'Serbuan Musuh (Raid)', combatMod: 'Tingkat Kesulitan Pertarungan', deathMod: 'Hukuman Kematian',
+    saveModsBtn: 'Simpan Modifier', unsavedBar: 'perubahan belum diterapkan. Aktif setelah restart.',
+    discardBtn: 'Batalkan', saveBtn: 'Simpan',
+    activeWorld: 'Save Aktif', snapshotsCount: 'Backup', createSnapBtn: 'Buat Snapshot Sekarang',
+    uploadWorldBtn: 'Unggah Save Dunia (.db / .fwl / .zip)', timeCol: 'Waktu', nameCol: 'Nama / Tag',
+    sizeCol: 'Ukuran', locCol: 'Lokasi', downloadBtn: 'Unduh .zip', rollbackBtn: 'Pulihkan',
+    noSnaps: 'Belum ada file backup.',
+    modsTitle: 'Mod Terpasang (BepInEx)', uploadModBtn: 'Unggah Mod (.dll / .zip)',
+    editConfigBtn: 'Edit Config', modRestartNotice: 'Perubahan mod aktif penuh setelah server direstart.',
+    settingsTitle: 'Pengaturan Sistem', discordCardTitle: 'Integrasi Webhook Discord',
+    addWebhookBtn: '+ Tambah Webhook', githubCardTitle: 'Sinkronisasi Cloud GitHub Release',
+    configGithubBtn: 'Konfigurasi GitHub', securityCardTitle: 'Keamanan Admin Panel',
+    changePassBtn: 'Ganti Password', testBtn: 'Uji Koneksi', saveConfigBtn: 'Simpan Pengaturan',
+    cancelBtn: 'Batal', confirmBtn: 'Konfirmasi', copied: 'Tersalin',
+    tabs: { overview: 'Overview', console: 'Console', world: 'World', players: 'Pemain', snap: 'Snapshots', mods: 'Mods', settings: 'Settings' }
+  }
+};
+
+const t = k => TXT[LANG][k] || k;
+
 const S = {
   st: 'running',
   up: 0,
@@ -58,6 +149,10 @@ const S = {
   code: '—',
   lobby: false,
   ip: '—',
+  pass: '••••••',
+  passReal: '',
+  showPass: false,
+  srvName: 'BarudakValheim',
   tab: 'overview',
   flt: 'all',
   chk: '',
@@ -65,10 +160,13 @@ const S = {
   logs: [],
   world: {},
   saved: {},
+  serverConf: { name: '', password: '', auto_backup_enabled: true, auto_backup_interval_hours: 6, retention_count: 10 },
+  serverConfSaved: {},
   snaps: [],
   admins: [],
   bans: [],
-  mods: []
+  mods: [],
+  settings: { server: {}, discord_webhooks: [], github: {} }
 };
 
 for (let i = 0; i < 40; i++) {
@@ -77,16 +175,16 @@ for (let i = 0; i < 40; i++) {
 }
 
 const WO = [
-  ['resources', 'Pengali sumber daya', 'Seberapa banyak drop dan hasil panen', [['1x', 'normal'], ['1.5x', 'more'], ['2x', 'muchmore'], ['3x', 'extreme']]],
-  ['portals', 'Regulasi portal', 'Apa yang boleh dibawa lewat portal', [['Normal', 'normal'], ['Casual', 'casual'], ['Hard', 'hard'], ['Tanpa portal', 'none']]],
-  ['raids', 'Serbuan musuh', 'Frekuensi raid ke base', [['None', 'none'], ['MuchLess', 'muchless'], ['PlayerEvents', 'playerevents'], ['Normal', 'normal'], ['MuchMore', 'muchmore']]],
-  ['combat', 'Kesulitan pertempuran', 'Kekuatan dan agresi musuh', [['V.Easy', 'veryeasy'], ['Easy', 'easy'], ['Normal', 'normal'], ['Hard', 'hard'], ['V.Hard', 'veryhard']]],
-  ['death_penalty', 'Hukuman kematian', 'Nasib barang dan karakter saat mati', [['Casual', 'casual'], ['Normal', 'normal'], ['Hard', 'hard'], ['Hardcore', 'hardcore']]]
+  ['resources', 'resourceMod', [['1x', 'normal'], ['1.5x', 'more'], ['2x', 'muchmore'], ['3x', 'extreme']]],
+  ['portals', 'portalMod', [['Normal', 'normal'], ['Casual', 'casual'], ['Hard', 'hard'], ['None', 'none']]],
+  ['raids', 'raidMod', [['None', 'none'], ['MuchLess', 'muchless'], ['PlayerEvents', 'playerevents'], ['Normal', 'normal'], ['MuchMore', 'muchmore']]],
+  ['combat', 'combatMod', [['V.Easy', 'veryeasy'], ['Easy', 'easy'], ['Normal', 'normal'], ['Hard', 'hard'], ['V.Hard', 'veryhard']]],
+  ['death_penalty', 'deathMod', [['Casual', 'casual'], ['Normal', 'normal'], ['Hard', 'hard'], ['Hardcore', 'hardcore']]]
 ];
 
 const hm = s => {
   const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
-  return h ? h + 'j ' + m + 'm' : m + 'm ' + (s % 60) + 'd';
+  return h ? h + 'h ' + m + 'm' : m + 'm ' + (s % 60) + 's';
 };
 
 const FL = { all: null, conn: ['CONN', 'INFO'], death: ['DEATH'], err: ['WARN', 'ERROR'] };
@@ -95,7 +193,7 @@ function lines(f, n) {
   let a = S.logs;
   if (f && FL[f]) a = a.filter(x => FL[f].includes(x[1]));
   if (n) a = a.slice(-n);
-  return a.map(x => `<div><span class=t>${x[0]}</span> <span class=${x[1]}>[${x[1]}]</span> ${x[2]}</div>`).join('') || '<div class=INFO>Belum ada log.</div>';
+  return a.map(x => `<div><span class=t>${x[0]}</span> <span class=${x[1]}>[${x[1]}]</span> ${x[2]}</div>`).join('') || '<div class=INFO>No logs recorded.</div>';
 }
 
 const spark = (a, c, mx) => {
@@ -115,10 +213,10 @@ function toast(m, e) {
   setTimeout(() => d.remove(), 3500);
 }
 
-function ask(t, b, lab, fn, dng) {
+function ask(title, body, lab, fn, dng) {
   const o = $('#ov');
   o.hidden = 0;
-  o.innerHTML = `<div class="mod ${dng ? 'dng' : ''}"><h3>${t}</h3><div class=mut>${b}</div><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn ${dng ? 'd' : 'p'}" id=ok>${lab}</button></div></div>`;
+  o.innerHTML = `<div class="mod ${dng ? 'dng' : ''}"><h3>${title}</h3><div class=mut>${body}</div><div class=row style="justify-content:flex-end"><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn ${dng ? 'd' : 'p'}" id=ok>${lab}</button></div></div>`;
   $('#ok').onclick = () => { o.hidden = 1; fn(); };
 }
 
@@ -128,33 +226,45 @@ async function act(a, d) {
     if (r.status === 401) { window.location.href = '/login'; return; }
     const j = await r.json();
     if (j.ok) {
-      toast(j.message || 'Perintah berhasil: ' + a);
+      toast(j.message || 'Action executed: ' + a);
     } else {
-      toast(j.message || 'Gagal mengeksekusi ' + a, 1);
+      toast(j.message || 'Execution failed for ' + a, 1);
     }
   } catch (err) {
-    toast('API tidak terjangkau', 1);
+    toast('API connection error', 1);
   }
   setTimeout(poll, 800);
 }
 
 function power() {
   const b = S.st === 'rebooting', off = S.st === 'stopped';
-  if (off) return `<button class="btn p" data-a=start>Start server</button>`;
+  if (off) return `<button class="btn p" data-a=start>${t('start')}</button>`;
   const x = b ? 'disabled' : '';
-  return `<div class=pw><div class=split><button class="btn p" data-a=rs0 ${x}>Restart</button><button class="btn p ch" data-a=menu ${x}><svg width=10 height=10 viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill=none stroke=currentColor stroke-width=1.6 /></svg></button><div class=menu id=menu hidden><button data-a=rs60>Restart, countdown 1 menit</button><button data-a=rs300>Restart, countdown 5 menit</button><hr><button data-a=kill style="color:var(--bad)">Kill paksa &amp; jalankan ulang</button></div></div><button class=btn data-a=save ${x}>Simpan dunia</button><span class=sep></span><button class="btn d" data-a=stop ${x}>Stop</button></div>`;
+  return `<div class=pw><div class=split><button class="btn p" data-a=rs0 ${x}>${t('restart')}</button><button class="btn p ch" data-a=menu ${x}><svg width=10 height=10 viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill=none stroke=currentColor stroke-width=1.6 /></svg></button><div class=menu id=menu hidden><button data-a=rs60>${t('restart1m')}</button><button data-a=rs300>${t('restart5m')}</button><hr><button data-a=kill style="color:var(--bad)">${t('forceKill')}</button></div></div><button class=btn data-a=save ${x}>${t('saveWorld')}</button><span class=sep></span><button class="btn d" data-a=stop ${x}>${t('stop')}</button></div>`;
 }
 
 function head() {
-  const L = { running: 'RUNNING', stopped: 'STOPPED', rebooting: 'REBOOTING' }[S.st] || S.st.toUpperCase();
-  $('#hd').innerHTML = `<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby ? 'running' : 'bad'}">PLAYFAB ${S.lobby ? 'ACTIVE' : 'STALL'}</span><span class=sp></span><span class="mono mut s11" id=upt>UPTIME ${S.st === 'running' ? hm(S.up) : '—'}</span>${power()}<span class=sep></span><span class="mono mut s11">ADMIN</span><a href="/logout" class="btn g d" style="margin-left:4px">Keluar</a>`;
+  const L = t(S.st) || S.st.toUpperCase();
+  $('#hd').innerHTML = `<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby ? 'running' : 'bad'}">PLAYFAB ${S.lobby ? t('active') : t('stall')}</span><span class=sp></span><span class="mono mut s11" id=upt>${t('uptime')} ${S.st === 'running' ? hm(S.up) : '—'}</span>${power()}<span class=sep></span><span class="mono mut s11">ADMIN</span><a href="/logout" class="btn g d" style="margin-left:4px">${t('logout')}</a>`;
 }
 
-const TABS = [['overview', 'Overview'], ['console', 'Console'], ['players', 'Pemain'], ['world', 'World'], ['snap', 'Snapshots'], ['mods', 'Mods']];
+const TABS = ['overview', 'console', 'world', 'players', 'snap', 'mods', 'settings'];
 
 function nav() {
-  const d = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
-  $('#nv').innerHTML = TABS.map(([k, l]) => `<a data-t=${k} class="${S.tab === k ? 'on' : ''}">${l}${k === 'world' && d ? `<small>${d}</small>` : k === 'players' ? `<small style="color:var(--m)">${S.players.length}</small>` : ''}</a>`).join('');
+  const dWorld = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
+  const dSrv = (S.serverConf.name !== S.serverConfSaved.name || S.serverConf.password !== S.serverConfSaved.password) ? 1 : 0;
+  const dTotal = dWorld + dSrv;
+
+  $('#nl').innerHTML = TABS.map(k => {
+    const label = t('tabs')[k] || k;
+    let badge = '';
+    if (k === 'world' && dTotal) badge = `<small>${dTotal}</small>`;
+    if (k === 'players') badge = `<small style="color:var(--m)">${S.players.length}</small>`;
+    if (k === 'mods') badge = `<small style="color:var(--m)">${S.mods.length}</small>`;
+    return `<a data-t=${k} class="${S.tab === k ? 'on' : ''}">${label}${badge}</a>`;
+  }).join('');
+
+  $('#btn-lang').textContent = `🌐 Language: ${LANG.toUpperCase()}`;
 }
 
 const vit = () => {
@@ -162,30 +272,118 @@ const vit = () => {
   return `<div><span class=mut>CPU</span>${spark(S.cpu, '#D97706', 100)}<b>${c.toFixed(1)}%</b></div><div><span class=mut>RAM</span>${spark(S.ram, '#0284C7', 100)}<b>${(r / 100 * 7.98).toFixed(1)} / 8 GB</b></div><div><span class=mut>DISK</span><span style="height:6px;background:var(--b)"><i style="display:block;height:6px;width:${Math.max(5, 100 - (S.disk || 40) / 80 * 100)}%;background:var(--ok)"></i></span><b>${S.disk} GB free</b></div>`;
 };
 
-const roster = () => S.players.length ? S.players.map(p => `<tr><td><b>${p.n}</b> ${p.adm ? '<span class="tag adm">ADMIN</span>' : ''}</td><td class=mono>${p.id}</td><td class=mut>${p.t}</td><td class=mono>${p.ping}</td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${p.n}">Kick</button><button class="btn g d" data-a=ban data-n="${p.n}">Ban</button></div></td></tr>`).join('') : '<tr><td colspan=5 class=mut>Tidak ada pemain online.</td></tr>';
+const roster = () => S.players.length ? S.players.map(p => `<tr><td><b>${p.n}</b> ${p.adm ? '<span class="tag adm">ADMIN</span>' : ''}</td><td class=mono>${p.id}</td><td class=mut>${p.t}</td><td class=mono><span class="tag ok">${p.ping}</span></td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${p.n}">Kick</button><button class="btn g d" data-a=ban data-n="${p.n}">Ban</button></div></td></tr>`).join('') : `<tr><td colspan=5 class=mut>${t('noPlayers')}</td></tr>`;
 
 const V = {
-  overview: () => `<div class=grid><div><h2>Join code</h2><div class="box plaque ${S.lobby ? '' : 'off'}"><div class=digits>${(S.code || '------').split('').map(d => `<i>${d}</i>`).join('')}</div><div class=row><button class="btn p" data-a=cp data-v="${S.code}">Salin kode</button><button class=btn data-a=disc>Siarkan ke Discord</button><span class="mut s11" style="margin-left:auto">${S.lobby ? 'Terdaftar di PlayFab' : 'Lobi tidak terdaftar'}</span></div><div class="row mut s11"><span class=mono>${S.ip}</span><button class="btn g" data-a=cp data-v="${S.ip}">Salin</button><span>Direct join</span></div></div></div>
-<div><h2>Vitals host</h2><div class="box vit" id=vit>${vit()}</div></div></div>
-<div class=fix><h2>Server tidak muncul di Valheim?</h2><div class=box><ol>
-<li><span class=n>1</span><div><b>Periksa lobi PlayFab</b><p>Cek apakah server masih terdaftar di Azure.</p>${S.chk ? `<div class=res>${S.chk}</div>` : ''}</div><button class=btn data-a=chk>Periksa</button></li>
-<li><span class=n>2</span><div><b>Reset lobi</b><p>Buka ulang socket matchmaking, join code baru dikirim ke Discord otomatis.</p></div><button class=btn data-a=rl>Reset lobi</button></li>
-<li><span class=n>3</span><div><b>Restart paksa</b><p>Jika engine hang total: simpan dunia lalu kill proses dan jalankan ulang.</p></div><button class="btn d" data-a=kill>Kill &amp; restart</button></li></ol></div></div>
-<h2>Pemain bertualang</h2><div class=box style="margin-bottom:28px"><table><tr><th>Karakter</th><th>Steam ID</th><th>Online</th><th>Ping</th><th class=r>Aksi</th></tr>${roster()}</table></div>
-<h2>Log terbaru <a data-t=console style="color:var(--a);cursor:pointer;text-transform:none;letter-spacing:0;font-family:Inter">buka console</a></h2><div class="term mini" id=tail>${lines(null, 6)}</div>`,
+  overview: () => `<div class=grid><div><h2>${t('joinCode')}</h2>
+<div class="box plaque ${S.lobby ? '' : 'off'}">
+  <div class=digits>${(S.code || '------').split('').map(d => `<i>${d}</i>`).join('')}</div>
+  <div class=row><button class="btn p" data-a=cp data-v="${S.code}">${t('copyCode')}</button><button class=btn data-a=disc>${t('broadcastDiscord')}</button><span class="mut s11" style="margin-left:auto">${S.lobby ? t('registeredPlayFab') : t('stall')}</span></div>
+  <div class="row mut s11"><span class=mono>${S.ip}</span><button class="btn g" data-a=cp data-v="${S.ip}">${t('copyIp')}</button><span>${t('directJoin')}</span></div>
+  <div class="row mut s11" style="border-top:1px solid var(--b);padding-top:10px;margin-top:2px">
+    <span>${t('serverPassword')}:</span>
+    <b class=mono style="color:var(--t)">${S.showPass ? S.passReal : '••••••••'}</b>
+    <button class="btn g" data-a=togpass>${S.showPass ? 'Hide' : 'Show'}</button>
+    <button class="btn g" data-a=cp data-v="${S.passReal}">${t('copyPass')}</button>
+    <span class="mut" style="margin-left:auto">World: <b style="color:var(--t)">${S.srvName}</b></span>
+  </div>
+</div></div>
+<div><h2>${t('hostVitals')}</h2><div class="box vit" id=vit>${vit()}</div></div></div>
 
-  console: () => `<div class=top2><div class=seg>${[['all', 'Semua'], ['conn', 'Koneksi/Lobi'], ['death', 'Kematian'], ['err', 'Error/Warning']].map(([k, l]) => `<button data-a=f data-v=${k} class="${S.flt === k ? 'on' : ''}">${l}</button>`).join('')}</div><span class=sp style="flex:1"></span><button class="btn g" data-a=clr>Bersihkan</button></div><div class=term id=term>${lines(S.flt)}</div><div class=cmd><span>&gt;</span><input id=ci placeholder="ketik perintah admin lalu Enter" autocomplete=off><button class="btn p" data-a=send>Kirim</button></div>`,
+<div class=fix><h2>${t('troubleshootTitle')}</h2><div class=box><ol>
+<li><span class=n>1</span><div><b>${t('step1Title')}</b><p>${t('step1Desc')}</p>${S.chk ? `<div class=res>${S.chk}</div>` : ''}</div><button class=btn data-a=chk>${t('checkBtn')}</button></li>
+<li><span class=n>2</span><div><b>${t('step2Title')}</b><p>${t('step2Desc')}</p></div><button class=btn data-a=rl>${t('resetBtn')}</button></li>
+<li><span class=n>3</span><div><b>${t('step3Title')}</b><p>${t('step3Desc')}</p></div><button class="btn d" data-a=kill>${t('killBtn')}</button></li></ol></div></div>
 
-  players: () => `<div class=two>${[['Admin server', 'adminlist.txt', 'admins'], ['Daftar blokir', 'bannedlist.txt', 'bans']].map(([t, f, k]) => `<div><h2>${t} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="SteamID 17 digit"><button class="btn p" data-a=add data-k=${k}>Tambah</button></div><table>${S[k].map((x, i) => `<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Hapus</button></td></tr>`).join('') || '<tr><td class=mut>Kosong.</td></tr>'}</table></div></div>`).join('')}</div>`,
+<h2>${t('onlinePlayers')}</h2><div class=box style="margin-bottom:28px"><table><tr><th>${t('charCol')}</th><th>${t('steamCol')}</th><th>${t('sessionCol')}</th><th>${t('pingCol')}</th><th class=r>${t('actCol')}</th></tr>${roster()}</table></div>
+<h2>${t('latestLogs')} <a data-t=console style="color:var(--a);cursor:pointer;text-transform:none;letter-spacing:0;font-family:Inter">${t('openConsole')}</a></h2><div class="term mini" id=tail>${lines(null, 6)}</div>`,
+
+  console: () => `<div class=top2><div class=seg>${[['all', t('allLogs')], ['conn', t('connLogs')], ['death', t('deathLogs')], ['err', t('errLogs')]].map(([k, l]) => `<button data-a=f data-v=${k} class="${S.flt === k ? 'on' : ''}">${l}</button>`).join('')}</div><span class=sp style="flex:1"></span><button class="btn g" data-a=clr>${t('clearBtn')}</button></div><div class=term id=term>${lines(S.flt)}</div><div class=cmd><span>&gt;</span><input id=ci placeholder="${t('cmdPlaceholder')}" autocomplete=off><button class="btn p" data-a=send>${t('sendBtn')}</button></div>`,
 
   world: () => {
-    const d = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
-    return `<h2>Aturan dunia</h2><div class="box list">${WO.map(([k, t, s, o]) => `<div><span><b>${t}</b><small>${s}</small></span><div class=seg>${o.map(([l, v]) => `<button data-a=w data-k=${k} data-v=${v} class="${S.world[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join('')}</div>${d ? `<div class=bar><span style="flex:1">${d} perubahan belum diterapkan. Aktif penuh setelah restart berikutnya.</span><button class=btn data-a=wr>Batalkan</button><button class=btn data-a=ws>Simpan</button><button class="btn p" data-a=wsr>Simpan &amp; restart</button></div>` : ''}`;
+    const dWorld = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
+    const dSrv = (S.serverConf.name !== S.serverConfSaved.name || S.serverConf.password !== S.serverConfSaved.password || S.serverConf.auto_backup_enabled !== S.serverConfSaved.auto_backup_enabled || S.serverConf.auto_backup_interval_hours !== S.serverConfSaved.auto_backup_interval_hours || S.serverConf.retention_count !== S.serverConfSaved.retention_count) ? 1 : 0;
+    const totalChanges = dWorld + dSrv;
+
+    return `<h2>${t('serverConfigTitle')}</h2>
+<div class="box card" style="margin-bottom:28px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--m)">${t('srvNameLabel')}<input class=in id="cfg-srv-name" value="${S.serverConf.name || ''}" placeholder="e.g. BarudakValheim"></label>
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--m)">${t('srvPassLabel')}<input class=in id="cfg-srv-pass" type="text" value="${S.serverConf.password || ''}" placeholder="Secret join password"></label>
+  </div>
+  <div style="display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:20px;padding-top:14px;border-top:1px solid var(--b)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="tog ${S.serverConf.auto_backup_enabled ? 'on' : ''}" data-a="togsrvbk"></button>
+      <span><b>${t('autoBackupLabel')}</b><small style="display:block;color:var(--m)">Snapshot world automatically in background</small></span>
+    </div>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--m)">${t('backupFreqLabel')}
+      <select class=in id="cfg-srv-freq">
+        <option value="2" ${S.serverConf.auto_backup_interval_hours == 2 ? 'selected' : ''}>Every 2 Hours</option>
+        <option value="6" ${S.serverConf.auto_backup_interval_hours == 6 ? 'selected' : ''}>Every 6 Hours</option>
+        <option value="12" ${S.serverConf.auto_backup_interval_hours == 12 ? 'selected' : ''}>Every 12 Hours</option>
+        <option value="24" ${S.serverConf.auto_backup_interval_hours == 24 ? 'selected' : ''}>Every 24 Hours (Daily)</option>
+      </select>
+    </label>
+    <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--m)">${t('retentionLabel')}
+      <select class=in id="cfg-srv-ret">
+        <option value="5" ${S.serverConf.retention_count == 5 ? 'selected' : ''}>Keep 5 Latest</option>
+        <option value="10" ${S.serverConf.retention_count == 10 ? 'selected' : ''}>Keep 10 Latest</option>
+        <option value="25" ${S.serverConf.retention_count == 25 ? 'selected' : ''}>Keep 25 Latest</option>
+        <option value="50" ${S.serverConf.retention_count == 50 ? 'selected' : ''}>Keep 50 Latest</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<h2>${t('modifiersTitle')}</h2>
+<div class="box list">${WO.map(([k, tKey, o]) => `<div><span><b>${t(tKey)}</b><small class=mono>${k}</small></span><div class=seg>${o.map(([l, v]) => `<button data-a=w data-k=${k} data-v=${v} class="${S.world[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join('')}</div>
+
+${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsavedBar')}</span><button class=btn data-a=wr>${t('discardBtn')}</button><button class=btn data-a=ws>${t('saveBtn')}</button><button class="btn p" data-a=wsr>${t('saveRestartBtn')}</button></div>` : ''}`;
   },
 
-  snap: () => `<div class=top2><span class="mut">Save aktif <b class=mono style="color:var(--t)">BarudakValheim</b> &nbsp; Backup <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn p" data-a=mk>Buat snapshot sekarang</button></div><div class=box><table><tr><th>Waktu</th><th>Nama / Tag</th><th>Ukuran</th><th>Lokasi</th><th class=r>Aksi</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOKAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>Unduh .zip</button><button class="btn g d" data-a=rb data-i=${i}>Pulihkan</button></div></td></tr>`).join('') || '<tr><td colspan=5 class=mut>Belum ada snapshot backup.</td></tr>'}</table></div>`,
+  players: () => `<div class=two>${[['Server Administrators', 'adminlist.txt', 'admins'], ['Blocked Steam Accounts', 'bannedlist.txt', 'bans']].map(([title, f, k]) => `<div><h2>${title} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="17-digit SteamID (7656...)"><button class="btn p" data-a=add data-k=${k}>Add</button></div><table>${S[k].map((x, i) => `<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Remove</button></td></tr>`).join('') || '<tr><td class=mut>List is empty.</td></tr>'}</table></div></div>`).join('')}</div>`,
 
-  mods: () => `<h2>Mod terpasang (BepInEx)</h2><div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>Edit config</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button></span></div>`).join('') || '<div class=mut>Tidak ada plugin BepInEx terdeteksi.</div>'}</div><p class="mut s11" style="margin-top:12px">Perubahan mod aktif penuh setelah engine game direstart.</p>`
+  snap: () => `<div class=top2><span class="mut">${t('activeWorld')} <b class=mono style="color:var(--t)">${S.srvName}</b> &nbsp; ${t('snapshotsCount')} <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn" data-a=upworld>${t('uploadWorldBtn')}</button><button class="btn p" data-a=mk>${t('createSnapBtn')}</button></div><div class=box><table><tr><th>${t('timeCol')}</th><th>${t('nameCol')}</th><th>${t('sizeCol')}</th><th>${t('locCol')}</th><th class=r>${t('actCol')}</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOCAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>${t('downloadBtn')}</button><button class="btn g d" data-a=rb data-i=${i}>${t('rollbackBtn')}</button></div></td></tr>`).join('') || `<tr><td colspan=5 class=mut>${t('noSnaps')}</td></tr>`}</table></div>`,
+
+  mods: () => `<div class=top2><span class="mut">${t('modsTitle')} &nbsp; <b class=mono style="color:var(--t)">${S.mods.length} Active</b></span><span style="flex:1"></span><button class="btn p" data-a=upmod>${t('uploadModBtn')}</button></div>
+<div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>${t('editConfigBtn')}</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button></span></div>`).join('') || '<div class=mut>No plugins installed.</div>'}</div><p class="mut s11" style="margin-top:12px">${t('modRestartNotice')}</p>`,
+
+  settings: () => `<div class=card-grid>
+  <div class=card>
+    <div class=card-head>
+      <div><h3>${t('discordCardTitle')}</h3><small class=mut>Deliver status updates, Join Codes, and death banners to Discord channels.</small></div>
+      <button class="btn p" data-a=addwh>${t('addWebhookBtn')}</button>
+    </div>
+    <div class="box list" style="margin-top:10px">${(S.settings.discord_webhooks || []).map((w, idx) => `<div>
+      <span><b>${w.name || 'Webhook'}</b> <span class="tag ${w.enabled ? 'ok' : ''}">${w.enabled ? 'ACTIVE' : 'DISABLED'}</span><small class=mono>${w.url_masked || w.url || 'Not configured'}</small></span>
+      <span class=row><button class="btn g" data-a=cfgwh data-i=${idx}>⚙️ Configure &amp; Events</button><button class="btn g d" data-a=delwh data-i=${idx}>Delete</button></span>
+    </div>`).join('') || '<div class=mut style="padding:14px">No Discord webhooks configured yet. Click "+ Add Webhook" above.</div>'}</div>
+  </div>
+
+  <div class=card>
+    <div class=card-head>
+      <div><h3>${t('githubCardTitle')}</h3><small class=mut>Automate offsite snapshot uploads to GitHub Releases repository.</small></div>
+      <button class="btn" data-a=cfggh>${t('configGithubBtn')}</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:8px">
+      <span class="tag ${(S.settings.github && S.settings.github.token_masked) ? 'gh' : ''}">${(S.settings.github && S.settings.github.token_masked) ? 'LINKED' : 'UNCONFIGURED'}</span>
+      <span>Repo: <b class=mono>${(S.settings.github && S.settings.github.repo) || 'None'}</b></span>
+      <span class=mut>Token: <span class=mono>${(S.settings.github && S.settings.github.token_masked) || 'Not set'}</span></span>
+    </div>
+  </div>
+
+  <div class=card>
+    <div class=card-head>
+      <div><h3>${t('securityCardTitle')}</h3><small class=mut>Manage web management panel authentication.</small></div>
+      <button class="btn" data-a=cfgpwd>${t('changePassBtn')}</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:8px">
+      <span class="tag ok">SECURED</span>
+      <span>Username: <b class=mono>admin</b></span>
+      <span class=mut>Algorithm: PBKDF2 SHA-256 (100,000 iterations)</span>
+    </div>
+  </div>
+</div>`
 };
 
 function render() {
@@ -201,8 +399,8 @@ async function fetchLogs() {
     if (r.ok) {
       const data = await r.json();
       S.logs = data.map(x => [x.timestamp, x.level, x.message]);
-      const t = $('#term');
-      if (t) { t.innerHTML = lines(S.flt === 'all' || S.tab === 'overview' ? null : S.flt); t.scrollTop = 1e9; }
+      const tEl = $('#term');
+      if (tEl) { tEl.innerHTML = lines(S.flt === 'all' || S.tab === 'overview' ? null : S.flt); tEl.scrollTop = 1e9; }
       const y = $('#tail');
       if (y) y.innerHTML = lines(null, 6);
     }
@@ -253,6 +451,20 @@ async function fetchMods() {
   } catch (e) {}
 }
 
+async function fetchSettings() {
+  try {
+    const r = await fetch(API + '/api/settings');
+    if (r.ok) {
+      S.settings = await r.json();
+      if (S.settings.server) {
+        S.serverConf = { ...S.settings.server };
+        S.serverConfSaved = { ...S.settings.server };
+      }
+      if (S.tab === 'settings') render();
+    }
+  } catch (e) {}
+}
+
 async function poll() {
   try {
     const r = await fetch(API + '/api/status');
@@ -269,17 +481,19 @@ async function poll() {
     S.lobby = j.playfab.is_active;
     S.code = j.playfab.join_code;
     S.ip = j.playfab.ip + ':' + j.playfab.port;
+    if (j.server.password) S.passReal = j.server.password;
+    if (j.server.name) S.srvName = j.server.name;
     S.players = j.players.map(p => ({
       n: p.character_name,
       id: p.steam_id,
       t: p.session_duration_str,
-      ping: 'Aktif',
+      ping: 'Online',
       adm: p.is_admin
     }));
   } catch (e) {}
 
   const u = $('#upt');
-  if (u) u.textContent = 'UPTIME ' + (S.st === 'running' ? hm(S.up) : '—');
+  if (u) u.textContent = t('uptime') + ' ' + (S.st === 'running' ? hm(S.up) : '—');
   const v = $('#vit');
   if (v) v.innerHTML = vit();
   head();
@@ -288,19 +502,28 @@ async function poll() {
   if (S.tab === 'players') fetchPlayers();
   if (S.tab === 'snap') fetchSnapshots();
   if (S.tab === 'mods') fetchMods();
+  if (S.tab === 'settings') fetchSettings();
   if (S.tab === 'world' && Object.keys(S.world).length === 0) fetchWorld();
 }
+
+$('#btn-lang').onclick = () => {
+  LANG = LANG === 'en' ? 'id' : 'en';
+  localStorage.setItem('thorpedo_lang', LANG);
+  head();
+  render();
+};
 
 document.addEventListener('click', e => {
   const m = $('#menu');
   if (m && !e.target.closest('.split')) m.hidden = 1;
-  const t = e.target.closest('[data-t]');
-  if (t) {
-    S.tab = t.dataset.t;
+  const tEl = e.target.closest('[data-t]');
+  if (tEl) {
+    S.tab = tEl.dataset.t;
     if (S.tab === 'players') fetchPlayers();
-    if (S.tab === 'world') fetchWorld();
+    if (S.tab === 'world') { fetchWorld(); fetchSettings(); }
     if (S.tab === 'snap') fetchSnapshots();
     if (S.tab === 'mods') fetchMods();
+    if (S.tab === 'settings') fetchSettings();
     if (S.tab === 'console') fetchLogs();
     return render();
   }
@@ -309,8 +532,8 @@ document.addEventListener('click', e => {
   if (!el) return;
   const a = el.dataset.a, D = el.dataset, pl = S.players.length;
 
-  const rs = d => d === 0 && pl ? ask('Restart sekarang?', `${pl} pemain sedang online dan akan terputus. Dunia disimpan dulu.`, 'Restart', () => act('restart_graceful', 0)) : act('restart_graceful', d);
-  const kill = () => ask('Kill paksa server?', 'Proses dimatikan seketika tanpa countdown. Gunakan jika engine hang. Perubahan sejak save terakhir bisa hilang.', 'Kill & restart', () => act('restart_force'), 1);
+  const rs = d => d === 0 && pl ? ask('Restart Server Now?', `${pl} players are online and will be disconnected. World will be saved first.`, 'Restart', () => act('restart_graceful', 0)) : act('restart_graceful', d);
+  const kill = () => ask('Force Kill Server Process?', 'Immediately sends SIGKILL (-9). Use if server is hanging unresponsive. Unsaved progress since last disk sync will be lost.', 'Kill & Restart', () => act('restart_force'), 1);
 
   ({
     menu: () => { m.hidden = !m.hidden; },
@@ -320,9 +543,10 @@ document.addEventListener('click', e => {
     kill,
     start: () => act('start'),
     save: () => act('force_save'),
-    stop: () => ask('Hentikan server?', `Server dimatikan dan baru jalan lagi saat kamu menekan Start. ${pl} pemain akan terputus.`, 'Stop', () => act('stop'), 1),
+    stop: () => ask('Stop Dedicated Server?', `Server process will be terminated until you click Start. ${pl} players will be disconnected.`, 'Stop', () => act('stop'), 1),
     x: () => { $('#ov').hidden = 1; },
-    cp: () => navigator.clipboard?.writeText(D.v).then(() => { el.textContent = 'Tersalin'; setTimeout(render, 1500); }),
+    togpass: () => { S.showPass = !S.showPass; render(); },
+    cp: () => navigator.clipboard?.writeText(D.v).then(() => { el.textContent = t('copied'); setTimeout(render, 1500); }),
     disc: () => act('broadcast_discord'),
     chk: async () => {
       try {
@@ -330,15 +554,15 @@ document.addEventListener('click', e => {
         const j = await r.json();
         S.chk = j.message;
         render();
-      } catch (err) { toast('Gagal memeriksa PlayFab', 1); }
+      } catch (err) { toast('Failed to probe PlayFab lobby', 1); }
     },
-    rl: () => ask('Reset lobi PlayFab?', 'Server di-restart terkelola dan mendapat Join Code baru. Pemain online terputus.', 'Reset lobi', () => act('reset_playfab'), 1),
+    rl: () => ask('Reset Matchmaking Lobby?', 'Server reboots gracefully and rotates PlayFab Join Code.', 'Reset Lobby', () => act('reset_playfab'), 1),
     kick: () => {
-      post('/api/console/command', { command: 'kick ' + D.n }).then(() => toast('Perintah kick dikirim'));
+      post('/api/console/command', { command: 'kick ' + D.n }).then(() => toast('Kick command sent for ' + D.n));
     },
-    ban: () => ask('Ban ' + D.n + '?', 'Karakter akan diblokir dari server.', 'Ban', () => {
+    ban: () => ask('Ban Player ' + D.n + '?', 'Character will be banned and disconnected from the server.', 'Ban', () => {
       post('/api/console/command', { command: 'ban ' + D.n });
-      toast(D.n + ' di-ban');
+      toast(D.n + ' banned');
     }, 1),
     f: () => { S.flt = D.v; render(); },
     clr: () => { S.logs = []; render(); },
@@ -358,47 +582,84 @@ document.addEventListener('click', e => {
         const id = inp.value.trim();
         const r = await post('/api/players/' + (D.k === 'admins' ? 'admin' : 'ban'), { steam_id: id });
         if (r.ok) {
-          toast('SteamID ditambahkan ke ' + D.k);
+          toast('SteamID registered to ' + D.k);
           inp.value = '';
           fetchPlayers();
-        } else { toast('Gagal menambahkan', 1); }
+        } else { toast('Failed to register SteamID', 1); }
       }
     },
     del: async () => {
       const id = S[D.k][D.i];
       const r = await del('/api/players/' + (D.k === 'admins' ? 'admin' : 'ban'), { steam_id: id });
       if (r.ok) {
-        toast('SteamID dihapus');
+        toast('SteamID removed');
         fetchPlayers();
-      } else { toast('Gagal menghapus', 1); }
+      } else { toast('Failed to remove SteamID', 1); }
+    },
+    togsrvbk: () => {
+      S.serverConf.auto_backup_enabled = !S.serverConf.auto_backup_enabled;
+      render();
     },
     w: () => { S.world[D.k] = D.v; render(); },
-    wr: () => { S.world = { ...S.saved }; render(); },
+    wr: () => {
+      S.world = { ...S.saved };
+      S.serverConf = { ...S.serverConfSaved };
+      render();
+    },
     ws: async () => {
+      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
+      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
+      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
+      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
+
+      await post('/api/server/config', {
+        name: srvName,
+        password: srvPass,
+        auto_backup_enabled: S.serverConf.auto_backup_enabled,
+        auto_backup_interval_hours: srvFreq,
+        retention_count: srvRet,
+        restart: False
+      });
+
       const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
       if (r.ok) {
         S.saved = { ...S.world };
+        S.serverConfSaved = { ...S.serverConf };
+        toast('Configuration and modifiers saved!');
         render();
-        toast('Pengaturan modifier dunia disimpan!');
-      } else { toast('Gagal menyimpan modifier', 1); }
+      } else { toast('Failed to save configuration', 1); }
     },
     wsr: async () => {
+      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
+      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
+      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
+      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
+
+      await post('/api/server/config', {
+        name: srvName,
+        password: srvPass,
+        auto_backup_enabled: S.serverConf.auto_backup_enabled,
+        auto_backup_interval_hours: srvFreq,
+        retention_count: srvRet,
+        restart: false
+      });
+
       const r = await post('/api/modifiers', { modifiers: S.world, restart: true });
       if (r.ok) {
         S.saved = { ...S.world };
-        render();
-        toast('Modifier disimpan & server sedang restart...');
+        S.serverConfSaved = { ...S.serverConf };
+        toast('Configuration saved. Server is restarting to apply changes...');
         setTimeout(poll, 1500);
-      } else { toast('Gagal menyimpan & restart', 1); }
+      } else { toast('Failed to save and restart', 1); }
     },
     mk: async () => {
-      toast('Membuat snapshot backup dunia...');
+      toast('Creating world snapshot archive...');
       const r = await post('/api/snapshots/create', {});
       if (r.ok) {
         const j = await r.json();
-        toast('Snapshot berhasil: ' + j.filename);
+        toast('Snapshot created: ' + j.filename);
         fetchSnapshots();
-      } else { toast('Gagal membuat snapshot', 1); }
+      } else { toast('Snapshot creation failed', 1); }
     },
     dl: () => {
       const snapName = S.snaps[D.i][0];
@@ -408,20 +669,26 @@ document.addEventListener('click', e => {
       const s = S.snaps[D.i];
       const o = $('#ov');
       o.hidden = 0;
-      o.innerHTML = `<div class="mod dng"><span class="chip bad" style="align-self:flex-start">PERINGATAN KRITIS</span><h3>Pulihkan ke ${s[0]}?</h3><div class=mut>Kondisi dunia saat ini akan ditimpa. Server dihentikan, save diekstrak, lalu dinyalakan kembali.</div><label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id=sf checked> Buat snapshot pengaman dari kondisi saat ini dulu</label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn d" id=ok>Pulihkan &amp; muat ulang</button></div></div>`;
+      o.innerHTML = `<div class="mod dng"><span class="chip bad" style="align-self:flex-start">CRITICAL RESTORE</span><h3>Rollback World to ${s[0]}?</h3><div class=mut>Current game world will be replaced. The server process will stop, restore the selected world snapshot, and reboot.</div><label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id=sf checked> Create safety backup of current world before overwriting</label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn d" id=ok>${t('confirmBtn')}</button></div></div>`;
       $('#ok').onclick = async () => {
         const sf = $('#sf').checked;
         o.hidden = 1;
-        toast('Memulai proses rollback ke ' + s[0] + '...');
+        toast('Restoring snapshot ' + s[0] + '...');
         const r = await post('/api/snapshots/rollback', { id: s[0], safety: sf });
         const j = await r.json();
         if (j.ok) {
           toast(j.message);
           setTimeout(poll, 2000);
         } else {
-          toast(j.message || 'Gagal rollback', 1);
+          toast(j.message || 'Rollback failed', 1);
         }
       };
+    },
+    upworld: () => {
+      $('#file-world').click();
+    },
+    upmod: () => {
+      $('#file-mod').click();
     },
     tg: async () => {
       const m = S.mods[D.i];
@@ -430,22 +697,231 @@ document.addEventListener('click', e => {
       if (r.ok) {
         m[3] = targetEnable ? 1 : 0;
         render();
-        toast('Mod ' + m[0] + (targetEnable ? ' diaktifkan.' : ' dinonaktifkan.') + ' Aktif setelah restart.');
+        toast('Mod ' + m[0] + (targetEnable ? ' enabled.' : ' disabled.') + ' Restart server to apply.');
       } else {
-        toast('Gagal toggle mod', 1);
+        toast('Failed to toggle mod', 1);
       }
     },
     cfg: () => {
       const m = S.mods[D.i];
       const o = $('#ov');
       o.hidden = 0;
-      o.innerHTML = `<div class=mod><h3>${m[0]} Configuration</h3><div class=mut>Pengaturan plugin dimuat dari config/${m[0]}.cfg. Ubah sesuai kebutuhan:</div><label>Parameter Config<textarea class="in" style="height:120px;font-family:var(--mono);resize:vertical" id=cfgtext># Config auto-managed for ${m[0]}&#10;enabled = ${m[3] ? 'true' : 'false'}&#10;custom_radius = 40</textarea></label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn p" id=sv>Simpan config</button></div></div>`;
+      o.innerHTML = `<div class=mod><h3>${m[0]} Configuration</h3><div class=mut>Config loaded from BepInEx/config/${m[0]}.cfg:</div><label>Configuration Parameters<textarea class="in" style="height:140px;font-family:var(--mono);resize:vertical" id=cfgtext># Auto-managed config for ${m[0]}&#10;enabled = ${m[3] ? 'true' : 'false'}&#10;custom_radius = 40</textarea></label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id=sv>${t('saveBtn')}</button></div></div>`;
       $('#sv').onclick = () => {
         o.hidden = 1;
-        toast('Config ' + m[0] + ' disimpan. Aktif setelah restart.');
+        toast('Config for ' + m[0] + ' saved. Active after restart.');
+      };
+    },
+    addwh: () => {
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class=mod><h3>Add Discord Webhook</h3>
+      <label>Webhook Label / Name<input class=in id="wh-name" placeholder="e.g. #valheim-alerts"></label>
+      <label>Webhook URL<input class=in id="wh-url" placeholder="https://discord.com/api/webhooks/..."></label>
+      <label>Role Mention Ping (Optional)<input class=in id="wh-role" placeholder="@everyone or <@&RoleID>"></label>
+      <label>Embed Accent Color (HEX)<input class=in id="wh-color" value="#D97706"></label>
+      <div class=row style="justify-content:space-between;margin-top:10px">
+        <button class="btn" id="wh-test">${t('testBtn')}</button>
+        <div class=row><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id="wh-save">${t('saveBtn')}</button></div>
+      </div></div>`;
+
+      $('#wh-test').onclick = async () => {
+        const url = $('#wh-url').value.trim();
+        const role = $('#wh-role').value.trim();
+        const color = $('#wh-color').value.trim();
+        if (!url) return toast('Please enter a Webhook URL first', 1);
+        toast('Sending test embed to Discord...');
+        const res = await post('/api/settings/discord/test', { url, mention_role: role, embed_color: color });
+        const j = await res.json();
+        toast(j.message, j.ok ? 0 : 1);
+      };
+
+      $('#wh-save').onclick = async () => {
+        const name = $('#wh-name').value.trim() || 'Webhook';
+        const url = $('#wh-url').value.trim();
+        const role = $('#wh-role').value.trim();
+        const color = $('#wh-color').value.trim() || '#D97706';
+        if (!url) return toast('Webhook URL is required', 1);
+
+        const newWh = {
+          id: 'wh_' + Date.now(),
+          name,
+          url,
+          enabled: true,
+          mention_role: role,
+          embed_color: color,
+          events: { server_start: true, playfab_rotate: true, player_event: true, backup_created: true }
+        };
+
+        const updated = (S.settings.discord_webhooks || []).concat(newWh);
+        await post('/api/settings', { discord_webhooks: updated });
+        o.hidden = 1;
+        toast('Webhook registered successfully!');
+        fetchSettings();
+      };
+    },
+    cfgwh: () => {
+      const wh = S.settings.discord_webhooks[D.i];
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class=mod><h3>Configure Webhook: ${wh.name}</h3>
+      <label>Webhook Label / Name<input class=in id="wh-name" value="${wh.name || ''}"></label>
+      <label>Webhook URL<input class=in id="wh-url" value="${wh.url || wh.url_masked || ''}"></label>
+      <label>Role Mention Ping<input class=in id="wh-role" value="${wh.mention_role || ''}" placeholder="e.g. @everyone or <@&123456789>"></label>
+      <label>Embed Color (HEX)<input class=in id="wh-color" value="${wh.embed_color || '#D97706'}"></label>
+      <div style="border-top:1px solid var(--b);padding-top:10px;margin-top:4px">
+        <b style="font-size:12px;color:var(--m);display:block;margin-bottom:8px">Dispatched Event Triggers</b>
+        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-boot" ${wh.events?.server_start ? 'checked' : ''}> Server Online Status</label>
+        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-code" ${wh.events?.playfab_rotate ? 'checked' : ''}> Join Code Rotation Alert</label>
+        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-player" ${wh.events?.player_event ? 'checked' : ''}> Player Join / Leave / Death</label>
+        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id="ev-backup" ${wh.events?.backup_created ? 'checked' : ''}> Automated Backup Finished</label>
+      </div>
+      <div class=row style="justify-content:space-between;margin-top:10px">
+        <button class="btn" id="wh-test">${t('testBtn')}</button>
+        <div class=row><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id="wh-save">${t('saveBtn')}</button></div>
+      </div></div>`;
+
+      $('#wh-test').onclick = async () => {
+        const url = $('#wh-url').value.trim();
+        const role = $('#wh-role').value.trim();
+        const color = $('#wh-color').value.trim();
+        toast('Testing Discord webhook ping...');
+        const res = await post('/api/settings/discord/test', { url, mention_role: role, embed_color: color });
+        const j = await res.json();
+        toast(j.message, j.ok ? 0 : 1);
+      };
+
+      $('#wh-save').onclick = async () => {
+        wh.name = $('#wh-name').value.trim();
+        wh.url = $('#wh-url').value.trim();
+        wh.mention_role = $('#wh-role').value.trim();
+        wh.embed_color = $('#wh-color').value.trim();
+        wh.events = {
+          server_start: $('#ev-boot').checked,
+          playfab_rotate: $('#ev-code').checked,
+          player_event: $('#ev-player').checked,
+          backup_created: $('#ev-backup').checked
+        };
+        await post('/api/settings', { discord_webhooks: S.settings.discord_webhooks });
+        o.hidden = 1;
+        toast('Webhook settings saved!');
+        fetchSettings();
+      };
+    },
+    delwh: () => {
+      ask('Delete Webhook?', 'This webhook endpoint will no longer receive alerts.', 'Delete', async () => {
+        S.settings.discord_webhooks.splice(D.i, 1);
+        await post('/api/settings', { discord_webhooks: S.settings.discord_webhooks });
+        toast('Webhook deleted.');
+        fetchSettings();
+      }, 1);
+    },
+    cfggh: () => {
+      const gh = S.settings.github || {};
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class=mod><h3>GitHub Offsite Sync Setup</h3>
+      <label>Repository (owner/repo)<input class=in id="gh-repo" value="${gh.repo || ''}" placeholder="e.g. Thaaan184/Thorpedo-Valheim"></label>
+      <label>Personal Access Token (Fine-Grained PAT)<input class=in id="gh-tok" type="password" value="${gh.token_masked || ''}" placeholder="github_pat_..."></label>
+      <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-top:6px"><input type=checkbox id="gh-rel" ${gh.auto_upload_releases ? 'checked' : ''}> Automatically upload world snapshots to GitHub Releases</label>
+      <div class=row style="justify-content:space-between;margin-top:14px">
+        <button class="btn" id="gh-test">${t('testBtn')}</button>
+        <div class=row><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id="gh-save">${t('saveBtn')}</button></div>
+      </div></div>`;
+
+      $('#gh-test').onclick = async () => {
+        const repo = $('#gh-repo').value.trim();
+        const token = $('#gh-tok').value.trim();
+        if (!repo) return toast('Please specify repository', 1);
+        toast('Testing GitHub authentication...');
+        const res = await post('/api/settings/github/test', { repo, token });
+        const j = await res.json();
+        toast(j.message, j.ok ? 0 : 1);
+      };
+
+      $('#gh-save').onclick = async () => {
+        const repo = $('#gh-repo').value.trim();
+        const token = $('#gh-tok').value.trim();
+        const autoRel = $('#gh-rel').checked;
+        await post('/api/settings', {
+          github: { repo, token, auto_upload_releases: autoRel }
+        });
+        o.hidden = 1;
+        toast('GitHub configuration saved!');
+        fetchSettings();
+      };
+    },
+    cfgpwd: () => {
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class=mod><h3>Change Panel Admin Password</h3>
+      <label>Current Password<input class=in id="pwd-curr" type="password"></label>
+      <label>New Password (min 6 characters)<input class=in id="pwd-new" type="password"></label>
+      <div class=row style="justify-content:flex-end;margin-top:12px">
+        <button class=btn data-a=x>${t('cancelBtn')}</button>
+        <button class="btn p" id="pwd-save">${t('saveBtn')}</button>
+      </div></div>`;
+
+      $('#pwd-save').onclick = async () => {
+        const cur = $('#pwd-curr').value;
+        const nw = $('#pwd-new').value;
+        if (!cur || !nw) return toast('Both password fields are required', 1);
+        const res = await post('/api/settings/password', { current_password: cur, new_password: nw });
+        const j = await res.json();
+        if (res.ok) {
+          o.hidden = 1;
+          toast('Admin password successfully updated!');
+        } else {
+          toast(j.detail || 'Password update rejected', 1);
+        }
       };
     }
   }[a] || (() => {}))();
+});
+
+// World upload file handler
+$('#file-world').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  toast('Uploading world save archive: ' + file.name + '...');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch(API + '/api/snapshots/upload-world', { method: 'POST', body: fd });
+    const j = await res.json();
+    if (j.ok) {
+      toast(j.message);
+      fetchSnapshots();
+    } else {
+      toast(j.message || 'World upload failed', 1);
+    }
+  } catch (err) {
+    toast('World upload network failure', 1);
+  }
+  e.target.value = '';
+});
+
+// Mod upload file handler
+$('#file-mod').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  toast('Uploading mod plugin: ' + file.name + '...');
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch(API + '/api/mods/upload', { method: 'POST', body: fd });
+    const j = await res.json();
+    if (j.ok) {
+      toast(j.message);
+      fetchMods();
+      ask('Mod Installed: ' + file.name, 'Do you want to restart the server now to activate the new mod?', 'Restart Now', () => act('restart_graceful', 0));
+    } else {
+      toast(j.message || 'Mod upload failed', 1);
+    }
+  } catch (err) {
+    toast('Mod upload network failure', 1);
+  }
+  e.target.value = '';
 });
 
 document.addEventListener('keydown', e => {
@@ -478,4 +954,5 @@ fetchPlayers();
 fetchSnapshots();
 fetchMods();
 fetchLogs();
+fetchSettings();
 </script></body></html>

@@ -76,6 +76,10 @@ def update_admin_credentials(username: str, password: Optional[str] = None):
     with open(CREDENTIALS_FILE, "w") as f:
         json.dump(curr, f, indent=2)
 
+def update_admin_password(new_password: str):
+    curr = get_admin_user()
+    update_admin_credentials(curr["username"], new_password)
+
 def create_session_token(username: str, max_age_seconds: int = 86400 * 7) -> str:
     exp = int(time.time()) + max_age_seconds
     payload = f"{username}:{exp}"
