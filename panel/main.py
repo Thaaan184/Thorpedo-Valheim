@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, File
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+from contextlib import asynccontextmanager
 
 sys.path.append(os.path.dirname(__file__))
 from auth import (
@@ -18,11 +19,10 @@ from auth import (
 from engine_manager import GameServerManager
 import services
 import settings_manager
+from webhook_manager import WebhookDispatcher, get_default_templates
 
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() == "true"
 PANEL_PORT = int(os.getenv("PANEL_PORT", "28456"))
-
-from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +31,11 @@ async def lifespan(app: FastAPI):
     if os.path.exists(binary) and os.getenv("AUTO_START_GAME", "true").lower() == "true":
         print("==> Auto-starting Valheim dedicated server engine via supervisor...")
         GameServerManager.get_instance().start()
+
+    # Start automated background backup worker
+    services.start_auto_backup_worker()
     yield
+
     # Graceful flush on container stop
     print("==> Container stopping: flushing Valheim world saves...")
     GameServerManager.get_instance().stop(timeout=30)
@@ -56,6 +60,20 @@ def require_auth(request: Request):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     return user
+
+# --- HEALTHCHECK & READINESS (UNAUTHENTICATED) ---
+
+@app.get("/healthz")
+@app.get("/api/health")
+async def healthz():
+    mgr = GameServerManager.get_instance()
+    st = mgr.status
+    return {
+        "status": "ok",
+        "game_status": st,
+        "playfab_ready": mgr.playfab_active,
+        "join_code_active": bool(mgr.playfab_join_code)
+    }
 
 # --- AUTH ROUTES ---
 
@@ -140,6 +158,8 @@ async def save_modifiers(payload: ModifiersPayload, user: str = Depends(require_
 class ServerConfigPayload(BaseModel):
     name: Optional[str] = None
     password: Optional[str] = None
+    access_password: Optional[str] = None
+    show_access_password: Optional[bool] = None
     auto_backup_enabled: Optional[bool] = None
     auto_backup_interval_hours: Optional[int] = None
     retention_count: Optional[int] = None
@@ -153,6 +173,10 @@ async def save_server_config(payload: ServerConfigPayload, user: str = Depends(r
         srv["name"] = payload.name
     if payload.password is not None:
         srv["password"] = payload.password
+    if payload.access_password is not None:
+        srv["access_password"] = payload.access_password
+    if payload.show_access_password is not None:
+        srv["show_access_password"] = payload.show_access_password
     if payload.auto_backup_enabled is not None:
         srv["auto_backup_enabled"] = payload.auto_backup_enabled
     if payload.auto_backup_interval_hours is not None:
@@ -184,6 +208,11 @@ async def download_snapshot(filename: str, user: str = Depends(require_auth)):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Snapshot archive not found")
     return FileResponse(file_path, filename=filename, media_type="application/zip")
+
+@app.delete("/api/snapshots/{filename}")
+async def delete_snapshot_endpoint(filename: str, user: str = Depends(require_auth)):
+    success = services.delete_snapshot(filename)
+    return {"success": success, "message": f"Snapshot '{filename}' deleted." if success else "Snapshot not found."}
 
 class RollbackPayload(BaseModel):
     id: Optional[str] = None
@@ -273,7 +302,7 @@ class CommandPayload(BaseModel):
 async def send_command(payload: CommandPayload, user: str = Depends(require_auth)):
     mgr = GameServerManager.get_instance()
     success = mgr.send_command(payload.command)
-    return {"success": success, "message": f"Command '{payload.command}' delivered to engine."}
+    return {"success": success, "message": f"Command '{payload.command}' delivered to engine." if success else "Failed: engine is not running."}
 
 # --- SETTINGS ENDPOINTS ---
 
@@ -287,17 +316,18 @@ async def update_settings_api(payload: Dict[str, Any], user: str = Depends(requi
     
     # Check github token mask
     new_gh = payload.get("github", {})
-    if new_gh.get("token") and "..." in new_gh["token"]:
+    if new_gh.get("token") and ("..." in new_gh["token"] or new_gh["token"] == "****"):
         new_gh["token"] = existing.get("github", {}).get("token", "")
         
-    # Check discord webhooks
-    new_whs = payload.get("discord_webhooks", [])
-    exist_wh_map = {w.get("id"): w for w in existing.get("discord_webhooks", [])}
-    for wh in new_whs:
-        if wh.get("url") and "..." in wh["url"]:
-            old_w = exist_wh_map.get(wh.get("id"))
-            if old_w:
-                wh["url"] = old_w.get("url", "")
+    # Check discord webhook URL mask
+    new_disc = payload.get("discord", {})
+    if new_disc.get("webhook_url") and "..." in new_disc["webhook_url"]:
+        new_disc["webhook_url"] = existing.get("discord", {}).get("webhook_url", "")
+
+    # Check access password mask
+    new_srv = payload.get("server", {})
+    if new_srv.get("access_password") == "••••••••":
+        new_srv["access_password"] = existing.get("server", {}).get("access_password", "")
 
     existing.update(payload)
     success = settings_manager.save_settings(existing)
@@ -309,19 +339,22 @@ async def update_settings_api(payload: Dict[str, Any], user: str = Depends(requi
     return {"ok": success, "message": "Settings updated successfully."}
 
 class DiscordTestPayload(BaseModel):
-    url: str
+    url: Optional[str] = ""
     mention_role: Optional[str] = ""
     embed_color: Optional[str] = "#D97706"
 
 @app.post("/api/settings/discord/test")
 async def test_discord_api(payload: DiscordTestPayload, user: str = Depends(require_auth)):
-    url = payload.url
-    if "..." in url:
-        settings = settings_manager.load_settings()
-        for wh in settings.get("discord_webhooks", []):
-            if wh.get("url") and wh["url"].startswith(url[:15]):
-                url = wh["url"]
-                break
+    url = payload.url or ""
+    settings = settings_manager.load_settings()
+    if not url or "..." in url:
+        url = settings.get("discord", {}).get("webhook_url", "")
+        if not url:
+            for wh in settings.get("discord_webhooks", []):
+                if wh.get("url"):
+                    url = wh["url"]
+                    break
+
     res = settings_manager.test_discord_webhook(url, payload.mention_role or "", payload.embed_color or "#D97706")
     return res
 
@@ -332,7 +365,7 @@ class GitHubTestPayload(BaseModel):
 @app.post("/api/settings/github/test")
 async def test_github_api(payload: GitHubTestPayload, user: str = Depends(require_auth)):
     tok = payload.token
-    if "..." in tok or not tok:
+    if "..." in tok or not tok or tok == "****":
         settings = settings_manager.load_settings()
         tok = settings.get("github", {}).get("token", "")
     res = settings_manager.test_github_token(payload.repo, tok)

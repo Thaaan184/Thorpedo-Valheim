@@ -50,21 +50,16 @@ python3 "${SCRIPT_DIR}/send_discord.py" \
     '[{"name": "📦 Status Ritual", "value": "Menyimpan Dunia & Memulai Ulang Container", "inline": true}, {"name": "⏳ Estimasi Jeda", "value": "`~1-2 Menit`", "inline": true}, {"name": "ℹ️ Catatan", "value": "Kunci gerbang (Join Code) baru akan segera disiarkan Hugin begitu langit kembali cerah.", "inline": false}]' \
     || true
 
-# 3. Graceful Stop: Docker mengirim SIGINT, Valheim flush world save ke disk sebelum container mati
-echo "[$(date -Iseconds)] Menghentikan container game secara aman (SIGINT world flush)..."
-cd "$ROOT_DIR"
-docker compose -p thorpedo stop -t 60 valheim
+# 3. Graceful Stop: Menggunakan Panel REST API jika aktif, atau Docker fallback
+echo "[$(date -Iseconds)] Mengirim sinyal graceful restart ke supervisor Thorpedo..."
+if curl -s -f http://127.0.0.1:28456/healthz > /dev/null 2>&1; then
+    curl -s -X POST http://127.0.0.1:28456/api/actions/execute \
+        -H "Content-Type: application/json" \
+        -d '{"action": "restart_graceful", "delay_seconds": 0}' || true
+else
+    cd "$ROOT_DIR"
+    docker compose -p thorpedo restart thorpedo || true
+fi
 
-# 4. Buat snapshot zip dan upload ke GitHub Release
-echo "[$(date -Iseconds)] Menjalankan snapshot backup & push GitHub Release..."
-python3 "${SCRIPT_DIR}/backup_to_release.py" \
-    --data-dir "${ROOT_DIR}/data" \
-    --backup-dir "${ROOT_DIR}/backups" \
-    --env-file "${ENV_FILE}" \
-    || echo "[WARN] Gagal membuat GitHub Release, melanjutkan restart..."
+echo "[$(date -Iseconds)] Siklus restorasi selesai. Sentinel otomatis akan menyiarkan Join Code baru sesaat lagi."
 
-# 5. Nyalakan kembali container game
-echo "[$(date -Iseconds)] Menyalakan kembali Valheim dedicated server..."
-docker compose -p thorpedo -f "${ROOT_DIR}/compose.yaml" up -d valheim
-
-echo "[$(date -Iseconds)] Siklus restorasi selesai. Monitor akan menyiarkan Join Code baru sesaat lagi."

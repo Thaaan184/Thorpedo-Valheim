@@ -128,12 +128,18 @@ http://<YOUR_SERVER_IP>:28456
 - **Local Retention Policy**: Prevent host disk full errors by setting automatic pruning (keep 5, 10, 25, or 50 latest backups).
 - **One-Click Download & Rollback**: Download snapshot `.zip` archives directly to your PC, or perform an instant rollback with automatic pre-rollback safety snapshots.
 
-### 📢 5. Discord Multi-Webhook Sentinel
-- Set up unlimited Discord webhooks directly from the **Settings** tab.
-- Role Mention support: Ping `@everyone` or specific role IDs (`<@&123456789>`).
-- Custom accent embed colors (HEX).
-- Per-webhook event triggers: *Server Online*, *Join Code Rotated*, *Player Events*, and *Backup Completed*.
-- Live webhook testing button with immediate feedback.
+### 📢 5. Autonomous Discord Sentinel & Template Engine
+- **Fully Automatic Event Alerts**: No manual dashboard triggers needed. The supervisor monitors the engine and automatically dispatches rich Discord embeds when:
+  - Server reaches **`READY`** state with confirmed active Microsoft PlayFab Join Code.
+  - Server crashes unexpectedly (triggers auto-recovery alert).
+  - Supervisor auto-recovers and re-launches the game server.
+  - PlayFab matchmaking rotates the Join Code.
+  - World backup succeeds or fails.
+- **Customizable Message Templates**: Edit titles and descriptions using dynamic placeholders:
+  - `{server_name}`, `{join_code}`, `{access_password}`, `{server_status}`, `{online_players}`, `{max_players}`, `{world_name}`, `{server_version}`, `{timestamp}`.
+- **Join Code Shared Access Password**: Configure a shared join password once in Settings; the sentinel automatically broadcasts it alongside the Join Code to your Discord channel.
+- **Reliable Dispatch**: Non-blocking thread pool execution with automatic exponential backoff retries and de-duplication to prevent spam.
+- **Role Mentions & Colors**: Ping `@everyone` or `<@&role_id>` with custom HEX embed themes.
 
 ### ☁️ 6. GitHub Releases Offsite Backup
 - Connect your GitHub repository and Personal Access Token (PAT) via the Settings tab.
@@ -190,6 +196,7 @@ All management routes are protected via authenticated session cookies (`thorpedo
 
 | Endpoint | Method | Description |
 |---|---|---|
+| `/healthz` | `GET` | Unauthenticated container healthcheck & readiness check |
 | `/api/status` | `GET` | Returns live server vitals, CPU %, RAM MB, Join Code, and players |
 | `/api/actions/execute` | `POST` | Executes `restart_graceful`, `restart_force`, `force_save`, `reset_playfab` |
 | `/api/console/command` | `POST` | Dispatches admin console command to server `stdin` |

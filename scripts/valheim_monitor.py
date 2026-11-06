@@ -17,10 +17,18 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-WEBHOOK_URLS = [
-    "https://discord.com/api/webhooks/1565603847001477140/bvH2LI3fJ_jKKZd3iZx6BEzPQrjVMVVPnOhbfCv0PA9VkZICCHvfc11QbquBFjstWwct",
-    "https://discord.com/api/webhooks/1565697318710288404/Kj2liEVtzPE5LjSkd5gJnjxfhwbgjcp3qcv9Ng7z9RKCmUdrYIJ835Bcot0FN6XZ-uuY"
-]
+from pathlib import Path
+from dotenv import load_dotenv
+
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
+WEBHOOK_URLS = []
+env_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
+if env_url:
+    WEBHOOK_URLS.append(env_url)
+
 
 BOT_NAME = "Hugin"
 BOT_AVATAR = "https://cdn.discordapp.com/avatars/1565603847001477140/e217aa5263c97c1c8ff385e095ddb13f.png"

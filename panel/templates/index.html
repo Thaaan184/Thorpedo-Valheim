@@ -365,16 +365,47 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
   mods: () => `<div class=top2><span class="mut">${t('modsTitle')} &nbsp; <b class=mono style="color:var(--t)">${S.mods.length} Active</b></span><span style="flex:1"></span><button class="btn p" data-a=upmod>${t('uploadModBtn')}</button></div>
 <div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>${t('editConfigBtn')}</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button><button class="btn g d" data-a=delmod data-i=${i} title="Delete plugin">Delete</button></span></div>`).join('') || '<div class=mut>No plugins installed.</div>'}</div><p class="mut s11" style="margin-top:12px">${t('modRestartNotice')}</p>`,
 
-  settings: () => `<div class=card-grid>
+  settings: () => {
+    const d = S.settings.discord || {};
+    const srv = S.settings.server || {};
+    const last = d.last_delivery || {};
+    let statusBadge = '<span class="tag">IDLE</span>';
+    if (last.status === 'success') {
+      statusBadge = `<span class="tag ok">🟢 SENT: ${last.event || 'alert'} (${last.timestamp || ''})</span>`;
+    } else if (last.status === 'failed') {
+      statusBadge = `<span class="tag d">🔴 FAILED (${last.timestamp || ''}): ${last.error || 'error'}</span>`;
+    }
+
+    return `<div class=card-grid>
   <div class=card>
     <div class=card-head>
-      <div><h3>${t('discordCardTitle')}</h3><small class=mut>Deliver status updates, Join Codes, and death banners to Discord channels.</small></div>
-      <button class="btn p" data-a=addwh>${t('addWebhookBtn')}</button>
+      <div><h3>${t('discordCardTitle')}</h3><small class=mut>Autonomous sentinel: automatically dispatches Join Codes and recovery alerts.</small></div>
+      <button class="btn p" data-a=cfgdisc>⚙️ Configure Webhook &amp; Templates</button>
     </div>
-    <div class="box list" style="margin-top:10px">${(S.settings.discord_webhooks || []).map((w, idx) => `<div>
-      <span><b>${w.name || 'Webhook'}</b> <span class="tag ${w.enabled ? 'ok' : ''}">${w.enabled ? 'ACTIVE' : 'DISABLED'}</span><small class=mono>${w.url_masked || w.url || 'Not configured'}</small></span>
-      <span class=row><button class="btn g" data-a=cfgwh data-i=${idx}>⚙️ Configure &amp; Events</button><button class="btn g d" data-a=delwh data-i=${idx}>Delete</button></span>
-    </div>`).join('') || '<div class=mut style="padding:14px">No Discord webhooks configured yet. Click "+ Add Webhook" above.</div>'}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap">
+      <span class="tag ${d.enabled ? 'ok' : ''}">${d.enabled ? 'SENTINEL ACTIVE' : 'DISABLED'}</span>
+      <span>Webhook: <b class=mono>${d.webhook_url_masked || 'Not configured'}</b></span>
+      <span>Ping: <b class=mono>${d.mention_role || 'None'}</b></span>
+      <span style="flex:1"></span>
+      ${statusBadge}
+    </div>
+  </div>
+
+  <div class=card>
+    <div class=card-head>
+      <div><h3>Join Code Access Password</h3><small class=mut>Optional shared password automatically sent with Join Code to Discord.</small></div>
+      <button class="btn p" data-a=saveaccpass>Save Password</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class=in id="in-acc-pass" type="password" value="${srv.access_password_masked || srv.password || ''}" placeholder="Enter shared server password">
+        <button class="btn g" id="btn-show-acc-pass">👁️</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t)">
+        <input type="checkbox" id="chk-show-acc-pass" ${srv.show_access_password !== false ? 'checked' : ''}>
+        Include access password in Discord notifications
+      </label>
+    </div>
   </div>
 
   <div class=card>
@@ -400,7 +431,8 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
       <span class=mut>Algorithm: PBKDF2 SHA-256 (100,000 iterations)</span>
     </div>
   </div>
-</div>`
+</div>`;
+  },
 };
 
 function render() {
@@ -803,61 +835,114 @@ document.addEventListener('click', e => {
         fetchSettings();
       };
     },
-    cfgwh: () => {
-      const wh = S.settings.discord_webhooks[D.i];
+    saveaccpass: async () => {
+      const pass = $('#in-acc-pass')?.value || '';
+      const show = $('#chk-show-acc-pass')?.checked;
+      const res = await post('/api/settings', {
+        server: {
+          access_password: pass,
+          show_access_password: show
+        }
+      });
+      if (res.ok) {
+        toast('Access password settings saved!');
+        fetchSettings();
+      } else {
+        toast('Failed to save access password', 1);
+      }
+    },
+    cfgdisc: () => {
+      const d = S.settings.discord || {};
+      const tpls = d.templates || {};
+      const srvTpl = tpls.server_ready || {};
       const o = $('#ov');
       o.hidden = 0;
-      o.innerHTML = `<div class=mod><h3>Configure Webhook: ${wh.name}</h3>
-      <label>Webhook Label / Name<input class=in id="wh-name" value="${wh.name || ''}"></label>
-      <label>Webhook URL<input class=in id="wh-url" value="${wh.url || wh.url_masked || ''}"></label>
-      <label>Role Mention Ping<input class=in id="wh-role" value="${wh.mention_role || ''}" placeholder="e.g. @everyone or <@&123456789>"></label>
-      <label>Embed Color (HEX)<input class=in id="wh-color" value="${wh.embed_color || '#D97706'}"></label>
-      <div style="border-top:1px solid var(--b);padding-top:10px;margin-top:4px">
-        <b style="font-size:12px;color:var(--m);display:block;margin-bottom:8px">Dispatched Event Triggers</b>
-        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-boot" ${wh.events?.server_start ? 'checked' : ''}> Server Online Status</label>
-        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-code" ${wh.events?.playfab_rotate ? 'checked' : ''}> Join Code Rotation Alert</label>
-        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t);margin-bottom:6px"><input type=checkbox id="ev-player" ${wh.events?.player_event ? 'checked' : ''}> Player Join / Leave / Death</label>
-        <label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id="ev-backup" ${wh.events?.backup_created ? 'checked' : ''}> Automated Backup Finished</label>
-      </div>
-      <div class=row style="justify-content:space-between;margin-top:10px">
-        <button class="btn" id="wh-test">${t('testBtn')}</button>
-        <div class=row><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id="wh-save">${t('saveBtn')}</button></div>
-      </div></div>`;
+      o.innerHTML = `<div class=mod style="max-width:580px">
+        <h3>Discord Sentinel &amp; Template Configuration</h3>
+        <label>Webhook URL<input class=in id="disc-url" value="${d.webhook_url_masked || d.webhook_url || ''}" placeholder="https://discord.com/api/webhooks/..."></label>
+        <div style="display:flex;gap:12px;align-items:center">
+          <label style="flex:1">Role Mention<input class=in id="disc-role" value="${d.mention_role || ''}" placeholder="e.g. @everyone or <@&role_id>"></label>
+          <label style="flex:1">Embed Color (HEX)<input class=in id="disc-color" value="${d.embed_color || '#D97706'}"></label>
+        </div>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:10px;margin-top:6px;color:var(--t)">
+          <input type="checkbox" id="disc-enabled" ${d.enabled !== false ? 'checked' : ''}> Enable Autonomous Discord Notifications
+        </label>
 
-      $('#wh-test').onclick = async () => {
-        const url = $('#wh-url').value.trim();
-        const role = $('#wh-role').value.trim();
-        const color = $('#wh-color').value.trim();
-        toast('Testing Discord webhook ping...');
+        <div style="border-top:1px solid var(--b);padding-top:10px;margin-top:8px">
+          <b style="font-size:12px;color:var(--m);display:block;margin-bottom:8px">Automated Event Triggers</b>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-ready" ${d.events?.server_ready !== false ? 'checked' : ''}> Server Ready (Join Code)</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-offline" ${d.events?.server_offline !== false ? 'checked' : ''}> Server Offline</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-crash" ${d.events?.server_crash !== false ? 'checked' : ''}> Server Crash Alert</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-recovery" ${d.events?.server_recovery !== false ? 'checked' : ''}> Auto-Recovery Reboot</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-rotated" ${d.events?.join_code_rotated !== false ? 'checked' : ''}> Join Code Rotation</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-backup-ok" ${d.events?.backup_success !== false ? 'checked' : ''}> Backup Succeeded</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-backup-fail" ${d.events?.backup_failed !== false ? 'checked' : ''}> Backup Failed</label>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--b);padding-top:10px;margin-top:8px">
+          <b style="font-size:12px;color:var(--m);display:block;margin-bottom:6px">Join Code Ready Message Template</b>
+          <label>Title<input class=in id="tpl-ready-title" value="${srvTpl.title || '⚔️ {server_name} IS READY!'}"></label>
+          <label>Message Content<textarea class=in id="tpl-ready-desc" rows=3 style="font-family:inherit;font-size:12px">${srvTpl.description || ''}</textarea></label>
+          <small class=mut style="display:block;margin-top:4px;font-size:10px">Placeholders: {server_name}, {join_code}, {access_password}, {server_status}, {online_players}, {max_players}, {world_name}, {timestamp}</small>
+        </div>
+
+        <div class=row style="justify-content:space-between;margin-top:14px">
+          <button class="btn" id="disc-test">${t('testBtn')}</button>
+          <div class=row><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id="disc-save">${t('saveBtn')}</button></div>
+        </div>
+      </div>`;
+
+      $('#disc-test').onclick = async () => {
+        const url = $('#disc-url').value.trim();
+        const role = $('#disc-role').value.trim();
+        const color = $('#disc-color').value.trim();
+        toast('Dispatching test message to Discord...');
         const res = await post('/api/settings/discord/test', { url, mention_role: role, embed_color: color });
         const j = await res.json();
         toast(j.message, j.ok ? 0 : 1);
       };
 
-      $('#wh-save').onclick = async () => {
-        wh.name = $('#wh-name').value.trim();
-        wh.url = $('#wh-url').value.trim();
-        wh.mention_role = $('#wh-role').value.trim();
-        wh.embed_color = $('#wh-color').value.trim();
-        wh.events = {
-          server_start: $('#ev-boot').checked,
-          playfab_rotate: $('#ev-code').checked,
-          player_event: $('#ev-player').checked,
-          backup_created: $('#ev-backup').checked
+      $('#disc-save').onclick = async () => {
+        const url = $('#disc-url').value.trim();
+        const role = $('#disc-role').value.trim();
+        const color = $('#disc-color').value.trim();
+        const enabled = $('#disc-enabled').checked;
+        const events = {
+          server_ready: $('#ev-ready').checked,
+          server_offline: $('#ev-offline').checked,
+          server_crash: $('#ev-crash').checked,
+          server_recovery: $('#ev-recovery').checked,
+          join_code_rotated: $('#ev-rotated').checked,
+          backup_success: $('#ev-backup-ok').checked,
+          backup_failed: $('#ev-backup-fail').checked
         };
-        await post('/api/settings', { discord_webhooks: S.settings.discord_webhooks });
-        o.hidden = 1;
-        toast('Webhook settings saved!');
-        fetchSettings();
+        const curTpls = d.templates || {};
+        curTpls.server_ready = {
+          title: $('#tpl-ready-title').value.trim(),
+          description: $('#tpl-ready-desc').value.trim()
+        };
+
+        const res = await post('/api/settings', {
+          discord: {
+            enabled,
+            webhook_url: url,
+            mention_role: role,
+            embed_color: color,
+            events,
+            templates: curTpls
+          }
+        });
+
+        if (res.ok) {
+          o.hidden = 1;
+          toast('Discord Sentinel settings saved!');
+          fetchSettings();
+        } else {
+          toast('Failed to save settings', 1);
+        }
       };
-    },
-    delwh: () => {
-      ask('Delete Webhook?', 'This webhook endpoint will no longer receive alerts.', 'Delete', async () => {
-        S.settings.discord_webhooks.splice(D.i, 1);
-        await post('/api/settings', { discord_webhooks: S.settings.discord_webhooks });
-        toast('Webhook deleted.');
-        fetchSettings();
-      }, 1);
     },
     cfggh: () => {
       const gh = S.settings.github || {};

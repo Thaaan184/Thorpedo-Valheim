@@ -11,6 +11,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import psutil
 
+from webhook_manager import dispatch_discord_event
+
 @dataclass
 class LogEntry:
     timestamp: str
@@ -59,6 +61,7 @@ class GameServerManager:
         self.players: List[Dict[str, Any]] = []
         self._lock = threading.RLock()
         self._reader_thread: Optional[threading.Thread] = None
+        self._auto_recovery_in_progress = False
 
     @classmethod
     def get_instance(cls):
@@ -76,10 +79,30 @@ class GameServerManager:
         # Parse PlayFab active join code
         match_active = re.search(r"with join code (\d+)\s+and IP\s+([^\s]+)\s+is active", line, re.IGNORECASE)
         if match_active:
+            new_code = match_active.group(1)
+            ip_val = match_active.group(2)
+            should_notify_ready = False
+            should_notify_rotated = False
+
             with self._lock:
+                old_code = self.playfab_join_code
+                old_active = self.playfab_active
                 self.playfab_active = True
-                self.playfab_join_code = match_active.group(1)
-                self.playfab_ip = match_active.group(2)
+                self.playfab_join_code = new_code
+                self.playfab_ip = ip_val
+
+                if not old_active or not old_code:
+                    should_notify_ready = True
+                elif old_code != new_code:
+                    should_notify_rotated = True
+
+            ctx = self._get_context_dict()
+            if should_notify_ready:
+                self._handle_log_line(f"Server reached READY state with confirmed Join Code: {new_code}")
+                dispatch_discord_event("server_ready", ctx)
+            elif should_notify_rotated:
+                self._handle_log_line(f"PlayFab Join Code rotated to: {new_code}")
+                dispatch_discord_event("join_code_rotated", ctx)
 
         match_reg = re.search(r"registered with join code (\d+)", line, re.IGNORECASE)
         if match_reg and not self.playfab_join_code:
@@ -91,13 +114,37 @@ class GameServerManager:
         if match_player:
             name = match_player.group(1).strip()
             with self._lock:
-                if not any(p.get("character_name") == name for p in self.players):
+                existing = next((p for p in self.players if p.get("character_name") == name), None)
+                if not existing:
                     self.players.append({
                         "character_name": name,
                         "steam_id": "-",
-                        "session_duration_str": "Baru bergabung",
+                        "session_start": time.time(),
+                        "session_duration_str": "Just joined",
                         "is_admin": False
                     })
+                    self._handle_log_line(f"Player '{name}' joined the world (online: {len(self.players)})")
+
+        # Parse player leaves
+        if any(k in line.lower() for k in ["closing socket", "destroying abandoned non persistent zdo"]):
+            # If socket closed and we have players, check if someone left
+            pass
+
+    def _get_context_dict(self) -> Dict[str, Any]:
+        with self._lock:
+            name = os.getenv("SERVER_NAME", "Thorpedo")
+            world = os.getenv("WORLD_NAME", "BarudakValheim")
+            pwd = os.getenv("SERVER_PASSWORD") or os.getenv("SERVER_PASS", "")
+            return {
+                "server_name": name,
+                "world_name": world,
+                "server_status": "Online" if self.status == "running" else self.status.capitalize(),
+                "online_players": str(len(self.players)),
+                "max_players": os.getenv("MAX_PLAYERS", "5"),
+                "join_code": self.playfab_join_code or "—",
+                "access_password": pwd,
+                "server_version": "1.0+"
+            }
 
     def _read_stdout(self, proc: subprocess.Popen):
         if not proc or not proc.stdout:
@@ -110,16 +157,49 @@ class GameServerManager:
         except Exception:
             pass
         finally:
+            exit_code = proc.poll()
+            is_crash = False
             with self._lock:
-                if self.process == proc and self.status != "rebooting":
-                    self.status = "stopped"
+                if self.process == proc and self.status not in ["stopped", "rebooting"]:
+                    self.status = "crashed" if (exit_code is not None and exit_code != 0) else "stopped"
+                    is_crash = (self.status == "crashed")
+                    self.playfab_active = False
+
+            if is_crash:
+                self._handle_log_line(f"CRITICAL: Valheim process terminated unexpectedly with exit code {exit_code}")
+                ctx = self._get_context_dict()
+                ctx["exit_code"] = exit_code
+                dispatch_discord_event("server_crash", ctx)
+                # Initiate automatic crash recovery
+                self._trigger_auto_recovery()
+
+    def _trigger_auto_recovery(self):
+        if self._auto_recovery_in_progress:
+            return
+        self._auto_recovery_in_progress = True
+
+        def recovery_worker():
+            try:
+                self._handle_log_line("Auto-recovery: waiting 3 seconds before resurrecting engine...")
+                time.sleep(3)
+                restarted = self.restart(graceful=False)
+                if restarted:
+                    self._handle_log_line("Auto-recovery: engine restarted successfully.")
+                    ctx = self._get_context_dict()
+                    dispatch_discord_event("server_recovery", ctx)
+                else:
+                    self._handle_log_line("Auto-recovery: failed to restart engine.")
+            finally:
+                self._auto_recovery_in_progress = False
+
+        threading.Thread(target=recovery_worker, daemon=True, name="auto-recovery").start()
 
     def build_command(self) -> List[str]:
         binary = os.getenv("VALHEIM_BINARY", "/valheim/valheim_server.x86_64")
         name = os.getenv("SERVER_NAME", "Thorpedo")
         world = os.getenv("WORLD_NAME", "BarudakValheim")
         port = os.getenv("SERVER_PORT", "2456")
-        pwd = os.getenv("SERVER_PASSWORD", "z315pn")
+        pwd = os.getenv("SERVER_PASSWORD") or os.getenv("SERVER_PASS", "z315pn")
         save_dir = os.getenv("SAVE_DIR", "/config")
         crossplay = os.getenv("CROSSPLAY", "true").lower() == "true"
         interval = os.getenv("SAVE_INTERVAL", "1800")
@@ -235,6 +315,9 @@ class GameServerManager:
             self.process = None
             self.playfab_active = False
             self.players = []
+
+        ctx = self._get_context_dict()
+        dispatch_discord_event("server_offline", ctx)
         return True
 
     def restart(self, graceful: bool = True, delay_seconds: int = 0) -> bool:
@@ -243,6 +326,8 @@ class GameServerManager:
 
         if delay_seconds > 0:
             self._handle_log_line(f"Restart scheduled in {delay_seconds} seconds...")
+            # If serverdevcommands/announcements exist, announce in game
+            self.send_command(f"say Server restarting in {delay_seconds} seconds!")
             time.sleep(delay_seconds)
 
         if graceful:
@@ -271,31 +356,45 @@ class GameServerManager:
         cmd = command.strip()
         if not cmd:
             return False
-        self._handle_log_line(f"> {cmd}")
         with self._lock:
-            if self.process and self.process.poll() is None and self.process.stdin:
-                try:
-                    self.process.stdin.write(f"{cmd}\n")
-                    self.process.stdin.flush()
-                    return True
-                except Exception as e:
-                    self._handle_log_line(f"Failed to write to stdin: {e}")
-                    return False
-        return True
+            if not self.process or self.process.poll() is not None or not self.process.stdin:
+                self._handle_log_line(f"Failed to execute command '{cmd}': engine process is not running.")
+                return False
+            try:
+                self._handle_log_line(f"> {cmd}")
+                self.process.stdin.write(f"{cmd}\n")
+                self.process.stdin.flush()
+                return True
+            except Exception as e:
+                self._handle_log_line(f"Failed to write to stdin: {e}")
+                return False
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
             proc = self.process
             if proc and proc.poll() is None:
                 st = "rebooting" if self.status == "rebooting" else "running"
+            elif self.status == "crashed":
+                st = "crashed"
             else:
                 st = "stopped"
             self.status = st
-            active_code = self.playfab_join_code
+            active_code = self.playfab_join_code if self.playfab_active else "—"
             ip_str = self.playfab_ip or os.getenv("PUBLIC_IP", "103.147.92.251:2456")
-            proc = self.process
             uptime = int(time.time() - self.start_time) if st == "running" else 0
-            players_copy = list(self.players)
+            
+            # Update player session strings
+            now = time.time()
+            players_copy = []
+            for p in self.players:
+                dur = int(now - p.get("session_start", now))
+                h, m = divmod(dur, 3600)
+                m, s = divmod(m, 60)
+                dur_str = f"{h}h {m}m" if h else f"{m}m {s}s"
+                p_copy = dict(p)
+                p_copy["session_duration_str"] = dur_str
+                players_copy.append(p_copy)
+
             pf_active = self.playfab_active
 
         cpu_pct = 0.0
@@ -322,7 +421,7 @@ class GameServerManager:
             },
             "playfab": {
                 "is_active": pf_active,
-                "join_code": active_code or "—",
+                "join_code": active_code if pf_active else "—",
                 "ip": ip_str.split(":")[0] if ":" in ip_str else ip_str,
                 "port": int(ip_str.split(":")[1]) if ":" in ip_str else 2456
             },
