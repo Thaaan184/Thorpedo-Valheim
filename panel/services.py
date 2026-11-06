@@ -334,6 +334,28 @@ def toggle_mod(name: str, enable: bool) -> bool:
         return True
     return False
 
+def delete_mod(name: str) -> bool:
+    if not os.path.exists(PLUGINS_DIR):
+        return False
+    dll = os.path.join(PLUGINS_DIR, f"{name}.dll")
+    dis = os.path.join(PLUGINS_DIR, f"{name}.dll.disabled")
+    deleted = False
+    if os.path.exists(dll):
+        try:
+            os.remove(dll)
+            deleted = True
+        except Exception:
+            pass
+    if os.path.exists(dis):
+        try:
+            os.remove(dis)
+            deleted = True
+        except Exception:
+            pass
+    if deleted:
+        get_manager()._handle_log_line(f"Deleted mod plugin: {name}")
+    return deleted
+
 def upload_mod(filename: str, file_bytes: bytes) -> Dict[str, Any]:
     os.makedirs(PLUGINS_DIR, exist_ok=True)
     clean_fn = os.path.basename(filename)

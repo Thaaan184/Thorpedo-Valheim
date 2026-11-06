@@ -10,7 +10,10 @@ nav{border-right:1px solid var(--b);background:var(--s);padding:12px 0;display:f
 .nav-links{display:flex;flex-direction:column}
 nav a{display:flex;justify-content:space-between;padding:9px 20px;color:var(--m);cursor:pointer;border-left:2px solid transparent;text-decoration:none}
 nav a:hover{color:var(--t)}nav a.on{color:var(--t);border-color:var(--a);background:var(--bg)}nav small{font:11px var(--mono);color:var(--a)}
-.lang-box{padding:12px 16px;border-top:1px solid var(--b)}
+.lang-box{padding:12px 14px;border-top:1px solid var(--b)}
+.lang-pill{display:flex;background:var(--s2);border:1px solid var(--b);border-radius:4px;overflow:hidden;padding:2px}
+.lang-opt{flex:1;background:none;border:0;color:var(--m);font:600 11px Inter,sans-serif;padding:6px 2px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:4px;transition:0.15s}
+.lang-opt:hover{color:var(--t)}.lang-opt.active{background:var(--bg);color:var(--a);box-shadow:0 1px 3px #0006}
 main{overflow:auto;padding:24px 28px 90px;position:relative}
 h2{font:700 11px var(--mono);letter-spacing:.14em;color:var(--m);text-transform:uppercase;display:flex;align-items:center;gap:12px;margin-bottom:12px}h2:after{content:"";flex:1;height:1px;background:var(--b)}
 .chip{display:inline-flex;align-items:center;gap:7px;font:700 11px var(--mono);letter-spacing:.08em;padding:4px 9px;border:1px solid var(--b);border-radius:2px;color:var(--m)}
@@ -50,7 +53,7 @@ input.in,select.in,textarea.in{background:var(--bg);border:1px solid var(--b);co
 .card-head h3{font:700 13px var(--mono);color:var(--t)}
 #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:60}#toast div{background:var(--s2);border:1px solid var(--b);border-left:3px solid var(--ok);padding:10px 14px;font-size:12px}#toast .e{border-left-color:var(--bad)}
 @media(max-width:860px){ #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}header{flex-wrap:wrap;padding:10px 14px}nav{display:flex;overflow:auto;border:0;border-bottom:1px solid var(--b)}nav a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}nav a.on{border-color:var(--a)}.grid,.two{grid-template-columns:1fr}main{padding:16px 14px 90px}.digits i{width:40px;font-size:34px}}
-</style></head><body><div id="app"><header id="hd"></header><nav id="nv"><div class="nav-links" id="nl"></div><div class="lang-box"><button class="btn g" id="btn-lang" style="width:100%">🌐 Language: EN</button></div></nav><main id="mn"></main></div>
+</style></head><body><div id="app"><header id="hd"></header><nav id="nv"><div class="nav-links" id="nl"></div><div class="lang-box" id="lb"></div></nav><main id="mn"></main></div>
 <div class="ov" id="ov" hidden></div><div id="toast"></div>
 <input type="file" id="file-world" style="display:none" accept=".db,.fwl,.zip">
 <input type="file" id="file-mod" style="display:none" accept=".dll,.zip">
@@ -264,7 +267,10 @@ function nav() {
     return `<a data-t=${k} class="${S.tab === k ? 'on' : ''}">${label}${badge}</a>`;
   }).join('');
 
-  $('#btn-lang').textContent = `🌐 Language: ${LANG.toUpperCase()}`;
+  $('#lb').innerHTML = `<div class="lang-pill">
+    <button class="lang-opt ${LANG === 'en' ? 'active' : ''}" data-l="en">🇬🇧 English</button>
+    <button class="lang-opt ${LANG === 'id' ? 'active' : ''}" data-l="id">🇮🇩 Indonesia</button>
+  </div>`;
 }
 
 const vit = () => {
@@ -333,10 +339,21 @@ const V = {
       </select>
     </label>
   </div>
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid var(--b);margin-top:6px">
+    <button class=btn data-a=savesrv>${t('saveServerBtn')}</button>
+    <button class="btn p" data-a=savesrvrestart>${t('saveRestartBtn')}</button>
+  </div>
 </div>
 
 <h2>${t('modifiersTitle')}</h2>
-<div class="box list">${WO.map(([k, tKey, o]) => `<div><span><b>${t(tKey)}</b><small class=mono>${k}</small></span><div class=seg>${o.map(([l, v]) => `<button data-a=w data-k=${k} data-v=${v} class="${S.world[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join('')}</div>
+<div class="box list">
+  ${WO.map(([k, tKey, o]) => `<div><span><b>${t(tKey)}</b><small class=mono>${k}</small></span><div class=seg>${o.map(([l, v]) => `<button data-a=w data-k=${k} data-v=${v} class="${S.world[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join('')}
+  <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--b);background:var(--s2)">
+    <button class=btn data-a=wr>${t('discardBtn')}</button>
+    <button class=btn data-a=ws>${t('saveModsBtn')}</button>
+    <button class="btn p" data-a=wsr>${t('saveRestartBtn')}</button>
+  </div>
+</div>
 
 ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsavedBar')}</span><button class=btn data-a=wr>${t('discardBtn')}</button><button class=btn data-a=ws>${t('saveBtn')}</button><button class="btn p" data-a=wsr>${t('saveRestartBtn')}</button></div>` : ''}`;
   },
@@ -346,7 +363,7 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
   snap: () => `<div class=top2><span class="mut">${t('activeWorld')} <b class=mono style="color:var(--t)">${S.srvName}</b> &nbsp; ${t('snapshotsCount')} <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn" data-a=upworld>${t('uploadWorldBtn')}</button><button class="btn p" data-a=mk>${t('createSnapBtn')}</button></div><div class=box><table><tr><th>${t('timeCol')}</th><th>${t('nameCol')}</th><th>${t('sizeCol')}</th><th>${t('locCol')}</th><th class=r>${t('actCol')}</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOCAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>${t('downloadBtn')}</button><button class="btn g d" data-a=rb data-i=${i}>${t('rollbackBtn')}</button></div></td></tr>`).join('') || `<tr><td colspan=5 class=mut>${t('noSnaps')}</td></tr>`}</table></div>`,
 
   mods: () => `<div class=top2><span class="mut">${t('modsTitle')} &nbsp; <b class=mono style="color:var(--t)">${S.mods.length} Active</b></span><span style="flex:1"></span><button class="btn p" data-a=upmod>${t('uploadModBtn')}</button></div>
-<div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>${t('editConfigBtn')}</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button></span></div>`).join('') || '<div class=mut>No plugins installed.</div>'}</div><p class="mut s11" style="margin-top:12px">${t('modRestartNotice')}</p>`,
+<div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>${t('editConfigBtn')}</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button><button class="btn g d" data-a=delmod data-i=${i} title="Delete plugin">Delete</button></span></div>`).join('') || '<div class=mut>No plugins installed.</div>'}</div><p class="mut s11" style="margin-top:12px">${t('modRestartNotice')}</p>`,
 
   settings: () => `<div class=card-grid>
   <div class=card>
@@ -516,6 +533,14 @@ $('#btn-lang').onclick = () => {
 document.addEventListener('click', e => {
   const m = $('#menu');
   if (m && !e.target.closest('.split')) m.hidden = 1;
+  const lBtn = e.target.closest('[data-l]');
+  if (lBtn) {
+    LANG = lBtn.dataset.l;
+    localStorage.setItem('thorpedo_lang', LANG);
+    head();
+    render();
+    return;
+  }
   const tEl = e.target.closest('[data-t]');
   if (tEl) {
     S.tab = tEl.dataset.t;
@@ -600,42 +625,12 @@ document.addEventListener('click', e => {
       S.serverConf.auto_backup_enabled = !S.serverConf.auto_backup_enabled;
       render();
     },
-    w: () => { S.world[D.k] = D.v; render(); },
-    wr: () => {
-      S.world = { ...S.saved };
-      S.serverConf = { ...S.serverConfSaved };
-      render();
-    },
-    ws: async () => {
+    savesrv: async () => {
       const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
       const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
       const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
       const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
-
-      await post('/api/server/config', {
-        name: srvName,
-        password: srvPass,
-        auto_backup_enabled: S.serverConf.auto_backup_enabled,
-        auto_backup_interval_hours: srvFreq,
-        retention_count: srvRet,
-        restart: False
-      });
-
-      const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
-      if (r.ok) {
-        S.saved = { ...S.world };
-        S.serverConfSaved = { ...S.serverConf };
-        toast('Configuration and modifiers saved!');
-        render();
-      } else { toast('Failed to save configuration', 1); }
-    },
-    wsr: async () => {
-      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
-      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
-      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
-      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
-
-      await post('/api/server/config', {
+      const r = await post('/api/server/config', {
         name: srvName,
         password: srvPass,
         auto_backup_enabled: S.serverConf.auto_backup_enabled,
@@ -643,12 +638,67 @@ document.addEventListener('click', e => {
         retention_count: srvRet,
         restart: false
       });
-
+      if (r.ok) {
+        S.serverConf = { ...S.serverConf, name: srvName, password: srvPass, auto_backup_interval_hours: srvFreq, retention_count: srvRet };
+        S.serverConfSaved = { ...S.serverConf };
+        toast('Server configuration saved!');
+        render();
+      } else {
+        toast('Failed to save server config', 1);
+      }
+    },
+    savesrvrestart: async () => {
+      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
+      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
+      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
+      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
+      const r = await post('/api/server/config', {
+        name: srvName,
+        password: srvPass,
+        auto_backup_enabled: S.serverConf.auto_backup_enabled,
+        auto_backup_interval_hours: srvFreq,
+        retention_count: srvRet,
+        restart: true
+      });
+      if (r.ok) {
+        toast('Server config saved. Rebooting server...');
+        setTimeout(poll, 1500);
+      } else {
+        toast('Failed to save and restart', 1);
+      }
+    },
+    delmod: () => {
+      const m = S.mods[D.i];
+      ask('Delete Mod ' + m[0] + '?', 'The plugin file will be permanently removed from plugins directory. Restart server to apply.', 'Delete', async () => {
+        const r = await fetch(API + '/api/mods/' + m[0], { method: 'DELETE' });
+        const j = await r.json();
+        if (r.ok && j.success) {
+          toast('Mod ' + m[0] + ' deleted.');
+          fetchMods();
+        } else {
+          toast(j.message || 'Failed to delete mod', 1);
+        }
+      }, 1);
+    },
+    w: () => { S.world[D.k] = D.v; render(); },
+    wr: () => {
+      S.world = { ...S.saved };
+      S.serverConf = { ...S.serverConfSaved };
+      render();
+    },
+    ws: async () => {
+      const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
+      if (r.ok) {
+        S.saved = { ...S.world };
+        toast('Gameplay modifiers saved!');
+        render();
+      } else { toast('Failed to save modifiers', 1); }
+    },
+    wsr: async () => {
       const r = await post('/api/modifiers', { modifiers: S.world, restart: true });
       if (r.ok) {
         S.saved = { ...S.world };
-        S.serverConfSaved = { ...S.serverConf };
-        toast('Configuration saved. Server is restarting to apply changes...');
+        toast('Modifiers saved. Server is restarting to apply changes...');
         setTimeout(poll, 1500);
       } else { toast('Failed to save and restart', 1); }
     },

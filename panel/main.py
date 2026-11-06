@@ -216,6 +216,19 @@ async def toggle_mod(payload: ToggleModPayload, user: str = Depends(require_auth
     success = services.toggle_mod(payload.name, payload.enable)
     return {"success": success}
 
+class DeleteModPayload(BaseModel):
+    name: str
+
+@app.delete("/api/mods/{name}")
+async def delete_mod_endpoint(name: str, user: str = Depends(require_auth)):
+    success = services.delete_mod(name)
+    return {"success": success, "message": f"Plugin '{name}' deleted." if success else "Plugin not found."}
+
+@app.post("/api/mods/delete")
+async def delete_mod_post(payload: DeleteModPayload, user: str = Depends(require_auth)):
+    success = services.delete_mod(payload.name)
+    return {"success": success, "message": f"Plugin '{payload.name}' deleted." if success else "Plugin not found."}
+
 @app.post("/api/mods/upload")
 async def upload_mod_api(file: UploadFile = File(...), user: str = Depends(require_auth)):
     contents = await file.read()

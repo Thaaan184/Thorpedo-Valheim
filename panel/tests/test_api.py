@@ -121,6 +121,11 @@ def test_api_upload_mod(auth_client):
     assert res.status_code == 200
     assert res.json()["ok"] is True
 
+    # Test delete mod
+    del_res = auth_client.delete("/api/mods/TestMod")
+    assert del_res.status_code == 200
+    assert del_res.json()["success"] is True
+
 def test_api_upload_world(auth_client):
     fake_db = io.BytesIO(b"ValheimWorldDbMockData")
     files = {"file": ("TestWorld.db", fake_db, "application/octet-stream")}
