@@ -523,13 +523,6 @@ async function poll() {
   if (S.tab === 'world' && Object.keys(S.world).length === 0) fetchWorld();
 }
 
-$('#btn-lang').onclick = () => {
-  LANG = LANG === 'en' ? 'id' : 'en';
-  localStorage.setItem('thorpedo_lang', LANG);
-  head();
-  render();
-};
-
 document.addEventListener('click', e => {
   const m = $('#menu');
   if (m && !e.target.closest('.split')) m.hidden = 1;
