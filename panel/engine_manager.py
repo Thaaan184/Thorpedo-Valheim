@@ -57,7 +57,7 @@ class GameServerManager:
         self.playfab_join_code: str = ""
         self.playfab_ip: str = ""
         self.players: List[Dict[str, Any]] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._reader_thread: Optional[threading.Thread] = None
 
     @classmethod
@@ -111,7 +111,7 @@ class GameServerManager:
             pass
         finally:
             with self._lock:
-                if self.status != "rebooting":
+                if self.process == proc and self.status != "rebooting":
                     self.status = "stopped"
 
     def build_command(self) -> List[str]:
@@ -268,7 +268,12 @@ class GameServerManager:
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
-            st = self.status
+            proc = self.process
+            if proc and proc.poll() is None:
+                st = "rebooting" if self.status == "rebooting" else "running"
+            else:
+                st = "stopped"
+            self.status = st
             active_code = self.playfab_join_code
             ip_str = self.playfab_ip or os.getenv("PUBLIC_IP", "103.147.92.251:2456")
             proc = self.process
@@ -278,9 +283,9 @@ class GameServerManager:
 
         cpu_pct = 0.0
         mem_mb = 0.0
-        if proc and proc.poll() is None:
+        if self.process and self.process.poll() is None:
             try:
-                p = psutil.Process(proc.pid)
+                p = psutil.Process(self.process.pid)
                 cpu_pct = p.cpu_percent(interval=None)
                 mem_mb = p.memory_info().rss / (1024 * 1024)
             except Exception:

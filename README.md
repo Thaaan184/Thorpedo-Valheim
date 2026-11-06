@@ -1,10 +1,10 @@
-# ⚔️ Thorpedo — Valheim Dedicated Server Stack
+# ⚔️ Thorpedo — Valheim Dedicated Server & Control Panel Stack
 
-Persistent, containerized Valheim Dedicated Server running on Docker with PlayFab Crossplay, server-side BepInEx mods, automated GitHub Release world snapshots, and real-time Discord monitoring.
+Stack dedicated server Valheim 1.0+ berbasis container Docker tunggal (**All-in-One Container**) yang mengintegrasikan engine game Valheim dan web management panel (**Thorpedo Control UI**) dalam satu lingkungan terpadu. Dilengkapi pengawas proses (*in-container process supervisor*), fitur anti-hang tanpa perlu `docker compose restart`, PlayFab Crossplay relay, server-side BepInEx mods, automated GitHub Release world snapshots, dan integrasi webhook Discord.
 
 ---
 
-## 🏛️ Arsitektur Sistem
+## 🏛️ Arsitektur Sistem (All-in-One Container)
 
 ```
                  [ Pemain Steam / Console / Tani ]
@@ -15,57 +15,103 @@ Persistent, containerized Valheim Dedicated Server running on Docker with PlayFa
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Target Ubuntu Host                                              │
+│ Host Server (Ubuntu Linux)                                      │
 │                                                                 │
-│  ┌───────────────────────────┐     ┌─────────────────────────┐  │
-│  │ Container: valheim        │     │ Container: playit       │  │
-│  │ - Engine: Valheim 1.0+    │     │ - Host networking       │  │
-│  │ - Loader: BepInEx 5.4     │◄───►│ - UDP Tunnels           │  │
-│  │ - Mods:                   │     │   (2456 / 2457)         │  │
-│  │   • NoCheatFlag           │     └─────────────────────────┘  │
-│  │   • ScheduledMessages     │                                  │
-│  │   • NetworkPerfSystem     │                                  │
-│  └─────────────┬─────────────┘                                  │
-│                │                                                │
-│  ┌─────────────▼─────────────┐     ┌─────────────────────────┐  │
-│  │ Persistent Volumes        │     │ Host Systemd Daemon     │  │
-│  │ • /data (worlds_local)    │◄───►│ • valheim_monitor.py    │──┐
-│  │ • /backups (archive .zip) │     │ • scheduled_restart.sh  │  │
-│  └─────────────┬─────────────┘     └─────────────────────────┘  │
-└────────────────┼────────────────────────────────────────────────┼┘
-                 │                                                │
-                 ▼                                                ▼
-     [ GitHub Releases API ]                          [ Discord Webhooks ]
-   (Automated World Snapshots)                       (Hugin Lore Watcher)
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ Container: thorpedo-valheim (All-in-One)                  │  │
+│  │                                                           │  │
+│  │  ┌─────────────────────────┐   ┌───────────────────────┐  │  │
+│  │  │ Web Control Panel       │   │ Valheim Game Engine   │  │  │
+│  │  │ • FastAPI + Uvicorn     │   │ • Valheim 1.0+        │  │  │
+│  │  │ • Port: 28456 (HTTP)    │   │ • BepInEx 5.4 Loader  │  │  │
+│  │  │ • Process Supervisor:   │   │ • Ports: 2456-2457/udp│  │  │
+│  │  │   - Graceful (SIGINT)   │──►│ • Managed Subprocess  │  │  │
+│  │  │   - Force Kill (SIGKILL)│   │   (In-place restart)  │  │  │
+│  │  │   - Ring-buffer console │   └───────────────────────┘  │  │
+│  │  └─────────────────────────┘                              │  │
+│  └─────────────┬─────────────────────────────┬───────────────┘  │
+│                │                             │                  │
+│  ┌─────────────▼─────────────┐ ┌─────────────▼───────────────┐  │
+│  │ Persistent Bind Mounts    │ │ Cloudflare Tunnel           │  │
+│  │ • ./data -> /config       │ │ • cloudflared tunnel        │  │
+│  │ • ./plugins -> /bepinex   │ │ • Zero-Trust Access         │  │
+│  │ • valheim-data (Volume)   │ │ • Ekspor Port 28456 Web     │  │
+│  └───────────────────────────┘ └─────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ⚙️ Spesifikasi & Aturan Dunia (World Rules)
+## ⚡ Keunggulan Arsitektur All-in-One
 
-- **Nama Server**: `Thorpedo`
-- **Networking**: PlayFab Crossplay Relay (`CROSSPLAY=true`)
-- **Password Gerbang**: Sesuai konfigurasi `.env`
-- **World Modifiers Aktif**:
-  - `resources=muchmore`: Hasil tebang kayu, tambang ore, dan drop hasil buruan **2x lipat**.
-  - `portals=casual`: Semua bijih tambang (copper, tin, iron, silver, blackmetal, flametal) dan dragon egg **bebas dibawa melewati portal kayu biasa**.
-  - `playerevents`: Serbuan monster ke markas (*base raid*) menyesuaikan pencapaian individu pemain di sekitar markas, melindungi markas pemula dari serangan monster tingkat tinggi.
+1. **In-Place Restart Tanpa Docker Restart**:
+   - Panel web berjalan sebagai supervisor proses game (`valheim_server.x86_64`) via Python subprocess.
+   - Melakukan restart server game **tidak mematikan container Docker**. Koneksi HTTP panel tetap hidup 100%.
+2. **Fitur Penyelamat Saat Game Hang / Freeze**:
+   - **Graceful Restart**: Mengirim sinyal `SIGINT` ke engine game agar data save dan chunk dunia tersimpan rapi ke disk sebelum proses dimuat ulang.
+   - **Force Kill (`kill -9`)**: Tombol darurat di panel untuk mematikan paksa engine game seketika saat thread socket membeku atau terjadi deadlock, lalu menyalakan ulang engine dalam hitungan detik.
+   - **Reset Lobi PlayFab**: Memulai ulang sesi PlayFab untuk memperbarui pendaftaran lobi dan merotasi Join Code.
+3. **Console Stream Real-Time**:
+   - Output stdout/stderr engine game ditangkap langsung ke in-memory ring-buffer panel. Tab **Console** menampilkan log aktivitas, join, save, hingga kill-feed secara langsung.
 
 ---
 
-## 🚀 Panduan Masuk Game (Client Join Guide)
+## 🖥️ Fitur Web Management Panel (Port 28456)
 
-### 1. Pemain Steam Original
-1. Buka Steam dan jalankan Valheim.
-2. Di menu utama, klik **Join Game** → klik tab **Add Server**.
-3. Masukkan **Join Code (6-digit)** aktif yang disiarkan di channel Discord.
-4. Masukkan password server saat diminta.
+Panel kontrol web Thorpedo dirancang dengan antarmuka gelap responsif bergaya taktikal (*JetBrains Mono + Inter*):
+- **Ringkasan Metrik**: Uptime engine, CPU Usage %, Memory RSS (MB/GB), dan sisa ruang disk host.
+- **Kartu Koneksi**: Status lobi PlayFab, 6-digit Join Code aktif, IP langsung, port game, dan tombol copy 1-klik.
+- **Roster Ksatria**: Memantau daftar karakter yang sedang aktif di dunia, status admin, dan durasi sesi bermain.
+- **Tindakan Cepat**: Menu aksi restart bertahap (instan, 60 detik, 5 menit dengan notifikasi), simpan paksa (*force save*), dan kill paksa.
+- **Manajemen Dunia**: Tab penyesuaian aturan modifier dunia (*resources, portals, raids, combat, death penalty*) langsung dari web.
+- **Snapshot & Rollback**: Manajemen backup berkala dan rollback data dunia yang aman.
+- **Manajemen Pemain**: Mengatur daftar admin (`adminlist.txt`) dan daftar blokir (`bannedlist.txt`).
 
-### 2. Pemain Non-Steam / Spacewar / Tani
-1. Pastikan aplikasi Steam di PC Anda **sudah login dan berjalan di background** (akun gratis apa saja).
-2. Jalankan game via `valheim.exe` atau launcher 1-click bawaan patch Online-Fix (status Steam akan terdeteksi memainkan *Spacewar* / AppID 480).
-3. Di menu utama Valheim: klik **Join Game** → klik **Add Server** (⚠️ **PERHATIAN**: Klik *Add Server*, **JANGAN** klik *Join IP*).
-4. Masukkan **Join Code (6-digit)** aktif dari Discord, lalu masukkan password.
+---
+
+## 🚀 Panduan Setup & Menjalankan
+
+### 1. Kloning Repositori
+```bash
+git clone https://github.com/Thaaan184/Thorpedo-Valheim.git /home/ids/projects/Thorpedo-Valheim
+cd /home/ids/projects/Thorpedo-Valheim
+```
+
+### 2. Konfigurasi Variabel Lingkungan (`.env`)
+Salin file konfigurasi contoh dan sesuaikan password serta port:
+```bash
+cp .env.example .env
+nano .env
+```
+Parameter penting:
+- `SERVER_NAME`: Nama server yang tampil di server browser (misal: `Thorpedo`).
+- `WORLD_NAME`: Nama world save (misal: `BarudakValheim`).
+- `SERVER_PASSWORD`: Password masuk server (minimal 5 karakter).
+- `PANEL_PORT`: Port HTTP panel web (default: `28456`).
+- `SERVER_PORT`: Port UDP server Valheim (default: `2456`).
+- `CROSSPLAY`: Set ke `true` untuk mengaktifkan PlayFab Join Code (lintas Steam, Game Pass, dan client tani).
+
+### 3. Build & Jalankan Container
+```bash
+docker compose build
+docker compose up -d
+```
+
+### 4. Periksa Status Layanan
+```bash
+# Periksa status container
+docker compose ps
+
+# Periksa log panel dan game engine
+docker compose logs -f thorpedo
+```
+
+### 5. Akses Panel Web
+Buka browser dan arahkan ke IP server host:
+```
+http://<IP_HOST>:28456/
+```
+*(Untuk akses jarak jauh yang aman, arahkan port `28456` melalui Cloudflare Tunnel / Cloudflare Access)*.
 
 ---
 
@@ -76,33 +122,26 @@ Server mengoperasikan mod mandiri di sisi server via BepInEx. Pemain **tidak per
 1. **`NoCheatFlag.dll`**: Membersihkan status `m_cheated` dari semua item yang jatuh di alam dan peti penyimpanan, mencegah bug infeksi cheat bawaan Valheim 1.0 yang dapat mengunci progres achievement pemain.
 2. **`ScheduledMessages.dll`**: Mengirimkan peringatan teks langsung di tengah layar semua pemain di dalam game sebelum siklus pemulihan alam dimulai (T-10m, T-5m, dan T-1m).
 3. **`Gjallarhorn.dll`**: Kill-feed & death announcer Nordik server-side. Menyiarkan kabar gugurnya ksatria (beserta monster/penyebab kematian) dan tumbangnya boss dunia langsung di chat dan banner tengah layar.
-4. **`WorkbenchLove.dll`**: Memperluas radius perlindungan dan pencegah spawn monster meja kerja (workbench protection & anti-mob spawn radius) dari 20m menjadi 40m.
-5. **`ServerDevcommands.dll`**: Membuka kunci perintah administratif darurat untuk admin server (skip time, forcedelete glitch item, stopevent raid, save paksa).
+4. **`WorkbenchLove.dll`**: Memperluas radius perlindungan dan pencegah spawn monster meja kerja (*workbench protection & anti-mob spawn radius*) dari 20m menjadi 40m.
+5. **`ServerDevcommands.dll`**: Membuka kunci perintah administratif darurat untuk admin server (*skip time, forcedelete glitch item, stopevent raid, save paksa*).
 6. **`CrossplayJoinCodeFix.dll`**: Mencegah bug NullReferenceException bawaan Valheim saat inisialisasi lobi PlayFab, memastikan Join Code selalu berhasil resolve di cloud Microsoft.
 7. **`NetworkPerformanceSystem.dll`**: Optimasi throughput sinkronisasi ZDO, kompensasi latensi, dan ukuran window paket UDP antar-pemain.
 
 ---
 
-## 🔄 Siklus Pemulihan Alam Terjadwal (Tiap 6 Jam: Jam 1 & 7)
+## 🎮 Panduan Masuk Game (Client Join Guide)
 
-Server menjalankan pembersihan cache, defragmentasi ZDO, dan kompresi data rutin setiap 6 jam pada pukul:
-**`01:00` • `07:00` • `13:00` • `19:00 WIB`**
+### 1. Pemain Steam Original
+1. Buka Steam dan jalankan Valheim.
+2. Di menu utama, klik **Join Game** → klik tab **Add Server**.
+3. Masukkan **Join Code (6-digit)** aktif yang tertera di panel web atau channel Discord.
+4. Masukkan password server saat diminta.
 
-### Urutan Prosedur:
-1. **Peringatan Dalam Game**: Banner teks peringatan muncul di layar pemain 10 menit, 5 menit, dan 1 menit sebelum server mati.
-2. **Pemberitahuan Discord**: Bot Hugin membagikan kartu peringatan badai.
-3. **Graceful World Flush**: Host mengeksekusi `docker compose stop -t 60 valheim`. Engine Valheim menerima sinyal `SIGINT` dan mem-flush seluruh chunk dunia yang aktif ke disk sebelum mematikan proses container.
-4. **Automated GitHub Release Snapshot**: Script `backup_to_release.py` membungkus file save aktif ke format `.zip` kompatibel Windows/Linux, membuat rilis baru bertag `snapshot-YYYYMMDD_HHMM`, dan mengunggah arsip ke tab [Releases](../../releases).
-5. **Cold Reboot**: Container dinyalakan kembali, PlayFab menerbitkan 6-digit Join Code baru, dan Hugin menyiarkan kode baru beserta tautan snapshot dunia ke Discord.
-
----
-
-## 🛡️ Proteksi Pemain Aktif (Player Guard)
-
-Siklus restart berkala dilindungi oleh gerbang proteksi pemain:
-* Setiap kali jam restart tiba (`01:00`, `07:00`, `13:00`, `19:00 WIB`), script otomatis mengecek jumlah pemain online.
-* Jika masih ada ksatria yang sedang bertualang (`active players > 0`), proses restart **dibatalkan/ditunda otomatis** ke siklus berikutnya. Pemain tidak akan pernah di-kick paksa di tengah aktivitas.
-* Restorasi alam hanya berjalan saat server benar-benar kosong.
+### 2. Pemain Non-Steam / Spacewar / Tani
+1. Pastikan aplikasi Steam di PC Anda **sudah login dan berjalan di background** (akun gratis apa saja).
+2. Jalankan game via `valheim.exe` atau launcher bawaan patch Online-Fix (status Steam akan terdeteksi memainkan *Spacewar* / AppID 480).
+3. Di menu utama Valheim: klik **Join Game** → klik **Add Server** (⚠️ **PERHATIAN**: Klik *Add Server*, **JANGAN** klik *Join IP*).
+4. Masukkan **Join Code (6-digit)** aktif dari panel web, lalu masukkan password.
 
 ---
 
@@ -110,46 +149,26 @@ Siklus restart berkala dilindungi oleh gerbang proteksi pemain:
 
 ```
 .
-├── compose.yaml                  # Definisi stack container Valheim & Playit
+├── Dockerfile                    # Multi-stage image: Valheim Engine + Python 3 + FastAPI
+├── compose.yaml                  # Definisi Docker Compose All-in-One stack
+├── entrypoint_allinone.sh        # Bootstrapper SteamCMD, BepInEx, dan launcher panel Uvicorn
 ├── .env.example                  # Template variabel lingkungan
+├── panel/
+│   ├── main.py                   # REST API backend FastAPI & router
+│   ├── engine_manager.py         # Supervisor proses game (SIGINT/SIGKILL, log buffer, PlayFab)
+│   ├── services.py               # Layer bisnis sistem, file config, snapshot, dan modifier
+│   ├── auth.py                   # Otentikasi sesi & token
+│   ├── templates/
+│   │   ├── index.html            # Antarmuka web baru Thorpedo Valheim Control
+│   │   └── login.html            # Antarmuka login form
+│   └── tests/
+│       ├── test_engine_manager.py # Pengujian unit supervisor proses
+│       └── test_api.py           # Pengujian endpoint REST API
 ├── config/
-│   └── scheduledmessages.cfg     # Jadwal pesan pengumuman in-game
+│   └── scheduledmessages.cfg     # Konfigurasi pesan otomatis dalam game
+├── plugins/                      # Plugin server-side BepInEx (.dll)
 ├── scripts/
-│   ├── valheim_monitor.py        # Host daemon pemantau event & webhook Discord
-│   ├── scheduled_restart.sh      # Skrip automasi siklus restart 6-jam
-│   ├── backup_to_release.py      # Pembuat snapshot zip & uploader GitHub Release
-│   └── send_discord.py           # CLI pengirim embed Discord webhook
+│   ├── scheduled_restart.sh      # Skrip backup berkala dan pemulihan otomatis
+│   └── backup_to_release.py      # Pengunggah snapshot zip ke GitHub Release
 └── README.md
-```
-
----
-
-## 🛠️ Panduan Deployment Mandiri
-
-### 1. Kloning dan Konfigurasi
-```bash
-git clone https://github.com/Thaaan184/Thorpedo-Valheim.git /opt/thorpedo
-cd /opt/thorpedo
-cp .env.example .env
-chmod 600 .env
-nano .env
-```
-
-### 2. Jalankan Server
-```bash
-docker compose up -d
-docker compose logs -f valheim
-```
-
-### 3. Pasang Systemd Watcher di Host
-```bash
-sudo cp scripts/thorpedo-monitor.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now thorpedo-monitor.service
-```
-
-### 4. Jadwalkan Crontab Host
-```cron
-# Eksekusi restart setiap pukul 01:00, 07:00, 13:00, 19:00 WIB (UTC+7 -> 17:55, 23:55, 05:55, 11:55 UTC)
-55 5,11,17,23 * * * /opt/thorpedo/scripts/scheduled_restart.sh >> /opt/thorpedo/logs/restart.log 2>&1
 ```
