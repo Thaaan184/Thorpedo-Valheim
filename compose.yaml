@@ -18,6 +18,8 @@ services:
       - "${SERVER_QUERY_PORT:-2457}:${SERVER_QUERY_PORT:-2457}/udp"
     volumes:
       - ./data:/config
+      - ./.env:/config/.env:rw
+      - ./backups:/config/backups:rw
       - thorpedo-game-data:/valheim
       - ./plugins/NoCheatFlag.dll:/opt/bepinex/BepInEx/plugins/NoCheatFlag.dll:ro
       - ./plugins/ScheduledMessages.dll:/opt/bepinex/BepInEx/plugins/ScheduledMessages.dll:ro

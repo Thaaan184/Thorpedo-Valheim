@@ -1,7 +1,7 @@
 import os
 import sys
 from fastapi import FastAPI, Request, Response, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -17,7 +17,7 @@ from auth import (
 from engine_manager import GameServerManager
 import services
 
-AUTH_ENABLED = os.getenv("AUTH_ENABLED", "false").lower() == "true"
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "true").lower() == "true"
 PANEL_PORT = int(os.getenv("PANEL_PORT", "28456"))
 
 from contextlib import asynccontextmanager
@@ -60,7 +60,7 @@ def require_auth(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if get_current_user(request):
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url="/" if get_current_user(request) else "/login", status_code=302)
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
 
 @app.post("/login", response_class=HTMLResponse)
@@ -92,7 +92,7 @@ async def dashboard_page(request: Request):
     user = get_current_user(request)
     if not user and AUTH_ENABLED:
         return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse(request=request, name="index.html", context={"user": user})
+    return templates.TemplateResponse(request=request, name="index.html", context={"user": user or "admin"})
 
 # --- API ENDPOINTS (PROTECTED / CLOUDFLARE ACCESS) ---
 
@@ -139,6 +139,18 @@ async def save_modifiers(payload: ModifiersPayload, user: str = Depends(require_
 async def get_snapshots(user: str = Depends(require_auth)):
     return services.get_snapshots()
 
+@app.post("/api/snapshots/create")
+async def create_snapshot_api(user: str = Depends(require_auth)):
+    res = services.create_snapshot()
+    return res
+
+@app.get("/api/snapshots/download/{filename}")
+async def download_snapshot(filename: str, user: str = Depends(require_auth)):
+    file_path = os.path.join(services.BACKUPS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File snapshot tidak ditemukan")
+    return FileResponse(file_path, filename=filename, media_type="application/zip")
+
 class RollbackPayload(BaseModel):
     id: Optional[str] = None
     snapshot_id: Optional[str] = None
@@ -147,7 +159,8 @@ class RollbackPayload(BaseModel):
 @app.post("/api/snapshots/rollback")
 async def rollback(payload: RollbackPayload, user: str = Depends(require_auth)):
     target_id = payload.id or payload.snapshot_id or "latest"
-    return {"ok": True, "message": f"Rollback ke {target_id} berhasil dijadwalkan."}
+    res = services.rollback_snapshot(target_id, safety=payload.safety if payload.safety is not None else True)
+    return res
 
 @app.get("/api/mods")
 async def get_mods(user: str = Depends(require_auth)):
@@ -198,8 +211,8 @@ class CommandPayload(BaseModel):
 @app.post("/api/console/command")
 async def send_command(payload: CommandPayload, user: str = Depends(require_auth)):
     mgr = GameServerManager.get_instance()
-    mgr._handle_log_line(f"> {payload.command}")
-    return {"success": True, "message": f"Perintah '{payload.command}' diterima."}
+    success = mgr.send_command(payload.command)
+    return {"success": success, "message": f"Perintah '{payload.command}' terkirim ke engine."}
 
 if __name__ == "__main__":
     import uvicorn

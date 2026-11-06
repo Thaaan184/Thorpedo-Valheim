@@ -15,7 +15,7 @@ h2{font:700 11px var(--mono);letter-spacing:.14em;color:var(--m);text-transform:
 .chip i{width:7px;height:7px;border-radius:50%;background:var(--m)}.chip.running{color:var(--ok);border-color:#0e5a43}.chip.running i{background:var(--ok);animation:p 2s infinite}
 .chip.stopped{color:var(--bad);border-color:#6b2327}.chip.stopped i{background:var(--bad)}.chip.rebooting{color:var(--w);border-color:#6b4d10}.chip.rebooting i{background:var(--w);animation:p .7s infinite}
 .chip.bad{color:var(--bad);border-color:#6b2327}@keyframes p{50%{opacity:.25}}
-.btn{font:600 12px Inter,sans-serif;color:var(--t);background:var(--s2);border:1px solid var(--b);border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap}
+.btn{font:600 12px Inter,sans-serif;color:var(--t);background:var(--s2);border:1px solid var(--b);border-radius:3px;padding:7px 13px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .btn:hover:not(:disabled){border-color:var(--m)}.btn:disabled{opacity:.35;cursor:not-allowed}.btn.p{background:var(--a);border-color:var(--a);color:#14100a}.btn.p:hover:not(:disabled){background:#ea8a12;border-color:#ea8a12}
 .btn.d{color:var(--bad);border-color:#5a2a2e;background:transparent}.btn.d:hover:not(:disabled){background:var(--bad);color:#14100a;border-color:var(--bad)}.btn.g{background:transparent;padding:4px 9px;font-size:11px}.btn.g.d{border-color:var(--b)}
 .split{position:relative;display:flex}.split .btn:first-child{border-radius:3px 0 0 3px}.split .ch{border-radius:0 3px 3px 0;border-left:1px solid #14100a55;padding:7px 9px}
@@ -47,80 +47,435 @@ input.in{flex:1;background:var(--bg);border:1px solid var(--b);color:var(--t);pa
 </style></head><body><div id="app"><header id="hd"></header><nav id="nv"></nav><main id="mn"></main></div>
 <div class="ov" id="ov" hidden></div><div id="toast"></div>
 <script>
-const API='';/* kosongkan = same-origin; isi mis. 'https://panel.domain.com' */
-let demo=true;const $=s=>document.querySelector(s);
-const S={st:'running',up:18450,cpu:[],ram:[],disk:44.8,code:'795624',lobby:true,ip:'103.147.92.251:2456',tab:'overview',flt:'all',chk:'',
-players:[{n:'Vazko',id:'76561199438190935',t:'1 jam 12 mnt',ping:32,adm:1},{n:'Thaaan',id:'76561198812034471',t:'24 mnt',ping:58}],logs:[],
-world:{resources:'muchmore',portals:'casual',raids:'playerevents',combat:'normal',death_penalty:'normal'},
-snaps:[['snapshot-20261104_175832','04 Nov 17:58',8.22,'GH'],['snapshot-20261104_110002','04 Nov 11:00',8.10,'GH'],['snapshot-20261103_230001','03 Nov 23:00',7.95,'LOKAL'],['snapshot-20261103_170000','03 Nov 17:00',7.88,'GH']],
-admins:['76561199438190935'],bans:['76561198000000001'],
-mods:[['CrossplayJoinCodeFix','v1.1.1','Memperbaiki Join Code untuk crossplay PlayFab',1],['Gjallarhorn','v0.3.0','Notifikasi kematian, boss banner, deteksi biome',1],['WorkbenchLove','v1.0.2','Perluas radius meja kerja pemain',0]]};
-S.saved={...S.world};for(let i=0;i<40;i++){S.cpu.push(12+Math.random()*8);S.ram.push(26+Math.random()*3)}
-const WO=[['resources','Pengali sumber daya','Seberapa banyak drop dan hasil panen',[['1x','normal'],['1.5x','more'],['2x','muchmore'],['3x','extreme']]],
-['portals','Regulasi portal','Apa yang boleh dibawa lewat portal',[['Normal','normal'],['Casual','casual'],['Hard','hard'],['Tanpa portal','none']]],
-['raids','Serbuan musuh','Frekuensi raid ke base',[['None','none'],['MuchLess','muchless'],['PlayerEvents','playerevents'],['Normal','normal'],['MuchMore','muchmore']]],
-['combat','Kesulitan pertempuran','Kekuatan dan agresi musuh',[['V.Easy','veryeasy'],['Easy','easy'],['Normal','normal'],['Hard','hard'],['V.Hard','veryhard']]],
-['death_penalty','Hukuman kematian','Nasib barang dan karakter saat mati',[['Casual','casual'],['Normal','normal'],['Hard','hard'],['Hardcore','hardcore']]]];
-const hm=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'j '+m+'m':m+'m '+s%60+'d'};
-const ts=()=>new Date().toTimeString().slice(0,8);
-function log(l,m){S.logs.push([ts(),l,m]);if(S.logs.length>300)S.logs.shift();const t=$('#term');if(t){t.innerHTML=lines(S.flt==='all'||S.tab==='overview'?null:S.flt);t.scrollTop=1e9}const y=$('#tail');if(y)y.innerHTML=lines(null,6)}
-const FL={all:null,conn:['CONN','INFO'],death:['DEATH'],err:['WARN','ERROR']};
-function lines(f,n){let a=S.logs;const k=f&&FL[f]?FL[f]:(f?null:null);if(f&&FL[f])a=a.filter(x=>FL[f].includes(x[1]));if(n)a=a.slice(-n);return a.map(x=>`<div><span class=t>${x[0]}</span> <span class=${x[1]}>[${x[1]}]</span> ${x[2]}</div>`).join('')||'<div class=INFO>Belum ada log.</div>'}
-[['INFO','PlayFab lobby terdaftar, join code 795624'],['CONN','Vazko terhubung (76561199438190935)'],['DEATH','Thaaan dibunuh Troll di Black Forest'],['WARN','ZDO flush memakan 1.8s']].forEach(x=>log(...x));
-const spark=(a,c,mx)=>{const w=100,h=26,M=mx||Math.max(...a)*1.2;const p=a.map((v,i)=>(i/(a.length-1)*w).toFixed(1)+','+(h-v/M*h).toFixed(1)).join(' ');return`<svg class=sl viewBox="0 0 100 26" preserveAspectRatio="none"><polyline points="${p}" fill="none" stroke="${c}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`};
-const post=(p,b)=>fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
-function toast(m,e){const d=document.createElement('div');d.textContent=m;if(e)d.className='e';$('#toast').appendChild(d);setTimeout(()=>d.remove(),3500)}
-function ask(t,b,lab,fn,dng){const o=$('#ov');o.hidden=0;o.innerHTML=`<div class="mod ${dng?'dng':''}"><h3>${t}</h3><div class=mut>${b}</div><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn ${dng?'d':'p'}" id=ok>${lab}</button></div></div>`;$('#ok').onclick=()=>{o.hidden=1;fn()}}
-function act(a,d){if(!demo){post('/api/actions/execute',{action:a,delay_seconds:d||0}).then(r=>r.ok?toast('Perintah terkirim: '+a):toast('Gagal ('+r.status+')',1)).catch(()=>toast('API tidak terjangkau',1));return}
-const boot=(ms,nc)=>{S.st='rebooting';S.lobby=false;S.players=[];head();log('WARN','Server dimatikan, menyimpan dunia...');setTimeout(()=>{S.st='running';S.up=0;S.lobby=true;if(nc)S.code=String(Math.floor(1e5+Math.random()*9e5));S.players=[{n:'Vazko',id:'76561199438190935',t:'0 mnt',ping:34,adm:1}];log('INFO','PlayFab lobby terdaftar, join code '+S.code);log('CONN','Vazko terhubung');head();render();toast('Server online. Join code '+S.code)},ms)};
-if(a==='restart_graceful'){log('INFO','Restart terjadwal'+(d?' dalam '+d+' detik':''));setTimeout(()=>boot(4000),Math.min((d||0),6)*1000)}
-if(a==='restart_force')boot(3000);if(a==='start')boot(3500);
-if(a==='reset_playfab'){boot(4500,1)}
-if(a==='stop'){S.st='stopped';S.lobby=false;S.players=[];log('WARN','Server dihentikan dari panel');head();render()}
-if(a==='force_save'){log('INFO','Dunia disimpan (flush ZDO selesai)');toast('Dunia tersimpan')}
-if(a==='broadcast_discord')toast('Embed Join Code dikirim ke #valheim');
-if(a==='check_playfab'){S.chk=S.lobby?'Lobi terdaftar di Azure, respons 184 ms. Tidak perlu reset.':'Lobi TIDAK terdaftar. Lanjut ke langkah 2.';render()}}
-function power(){const b=S.st==='rebooting',off=S.st==='stopped';if(off)return`<button class="btn p" data-a=start>Start server</button>`;const x=b?'disabled':'';
-return`<div class=pw><div class=split><button class="btn p" data-a=rs0 ${x}>Restart</button><button class="btn p ch" data-a=menu ${x}><svg width=10 height=10 viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill=none stroke=currentColor stroke-width=1.6 /></svg></button><div class=menu id=menu hidden><button data-a=rs60>Restart, countdown 1 menit</button><button data-a=rs300>Restart, countdown 5 menit</button><hr><button data-a=kill style="color:var(--bad)">Kill paksa &amp; jalankan ulang</button></div></div><button class=btn data-a=save ${x}>Simpan dunia</button><span class=sep></span><button class="btn d" data-a=stop ${x}>Stop</button></div>`}
-function head(){const L={running:'RUNNING',stopped:'STOPPED',rebooting:'REBOOTING'}[S.st];$('#hd').innerHTML=`<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby?'running':'bad'}">PLAYFAB ${S.lobby?'ACTIVE':'STALL'}</span><span class=sp></span><span class="mono mut s11" id=upt>UPTIME ${S.st==='running'?hm(S.up):'—'}</span>${power()}`}
-const TABS=[['overview','Overview'],['console','Console'],['players','Pemain'],['world','World'],['snap','Snapshots'],['mods','Mods']];
-function nav(){const d=Object.keys(S.world).filter(k=>S.world[k]!==S.saved[k]).length;$('#nv').innerHTML=TABS.map(([k,l])=>`<a data-t=${k} class="${S.tab===k?'on':''}">${l}${k==='world'&&d?`<small>${d}</small>`:k==='players'?`<small style="color:var(--m)">${S.players.length}</small>`:''}</a>`).join('')}
-const vit=()=>{const c=S.cpu.at(-1),r=S.ram.at(-1);return`<div><span class=mut>CPU</span>${spark(S.cpu,'#D97706',100)}<b>${c.toFixed(1)}%</b></div><div><span class=mut>RAM</span>${spark(S.ram,'#0284C7',100)}<b>${(r/100*7.98).toFixed(1)} / 8 GB</b></div><div><span class=mut>DISK</span><span style="height:6px;background:var(--b)"><i style="display:block;height:6px;width:${100-S.disk/80*100}%;background:var(--ok)"></i></span><b>${S.disk} GB free</b></div>`};
-const roster=()=>S.players.length?S.players.map(p=>`<tr><td><b>${p.n}</b> ${p.adm?'<span class="tag adm">ADMIN</span>':''}</td><td class=mono>${p.id}</td><td class=mut>${p.t}</td><td class=mono>${p.ping} ms</td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${p.n}">Kick</button><button class="btn g d" data-a=ban data-n="${p.n}">Ban</button></div></td></tr>`).join(''):'<tr><td colspan=5 class=mut>Tidak ada pemain online.</td></tr>';
-const V={
-overview:()=>`<div class=grid><div><h2>Join code</h2><div class="box plaque ${S.lobby?'':'off'}"><div class=digits>${S.code.split('').map(d=>`<i>${d}</i>`).join('')}</div><div class=row><button class="btn p" data-a=cp data-v="${S.code}">Salin kode</button><button class=btn data-a=disc>Siarkan ke Discord</button><span class="mut s11" style="margin-left:auto">${S.lobby?'Terdaftar di PlayFab':'Lobi tidak terdaftar'}</span></div><div class="row mut s11"><span class=mono>${S.ip}</span><button class="btn g" data-a=cp data-v="${S.ip}">Salin</button><span>Direct join</span></div></div></div>
+const API = '';
+const $ = s => document.querySelector(s);
+const S = {
+  st: 'running',
+  up: 0,
+  cpu: [],
+  ram: [],
+  disk: 0,
+  code: '—',
+  lobby: false,
+  ip: '—',
+  tab: 'overview',
+  flt: 'all',
+  chk: '',
+  players: [],
+  logs: [],
+  world: {},
+  saved: {},
+  snaps: [],
+  admins: [],
+  bans: [],
+  mods: []
+};
+
+for (let i = 0; i < 40; i++) {
+  S.cpu.push(0);
+  S.ram.push(0);
+}
+
+const WO = [
+  ['resources', 'Pengali sumber daya', 'Seberapa banyak drop dan hasil panen', [['1x', 'normal'], ['1.5x', 'more'], ['2x', 'muchmore'], ['3x', 'extreme']]],
+  ['portals', 'Regulasi portal', 'Apa yang boleh dibawa lewat portal', [['Normal', 'normal'], ['Casual', 'casual'], ['Hard', 'hard'], ['Tanpa portal', 'none']]],
+  ['raids', 'Serbuan musuh', 'Frekuensi raid ke base', [['None', 'none'], ['MuchLess', 'muchless'], ['PlayerEvents', 'playerevents'], ['Normal', 'normal'], ['MuchMore', 'muchmore']]],
+  ['combat', 'Kesulitan pertempuran', 'Kekuatan dan agresi musuh', [['V.Easy', 'veryeasy'], ['Easy', 'easy'], ['Normal', 'normal'], ['Hard', 'hard'], ['V.Hard', 'veryhard']]],
+  ['death_penalty', 'Hukuman kematian', 'Nasib barang dan karakter saat mati', [['Casual', 'casual'], ['Normal', 'normal'], ['Hard', 'hard'], ['Hardcore', 'hardcore']]]
+];
+
+const hm = s => {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? h + 'j ' + m + 'm' : m + 'm ' + (s % 60) + 'd';
+};
+
+const FL = { all: null, conn: ['CONN', 'INFO'], death: ['DEATH'], err: ['WARN', 'ERROR'] };
+
+function lines(f, n) {
+  let a = S.logs;
+  if (f && FL[f]) a = a.filter(x => FL[f].includes(x[1]));
+  if (n) a = a.slice(-n);
+  return a.map(x => `<div><span class=t>${x[0]}</span> <span class=${x[1]}>[${x[1]}]</span> ${x[2]}</div>`).join('') || '<div class=INFO>Belum ada log.</div>';
+}
+
+const spark = (a, c, mx) => {
+  const w = 100, h = 26, M = mx || Math.max(...a, 1) * 1.2;
+  const p = a.map((v, i) => (i / (a.length - 1) * w).toFixed(1) + ',' + (h - v / M * h).toFixed(1)).join(' ');
+  return `<svg class=sl viewBox="0 0 100 26" preserveAspectRatio="none"><polyline points="${p}" fill="none" stroke="${c}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+};
+
+const post = (p, b) => fetch(API + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+const del = (p, b) => fetch(API + p, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+
+function toast(m, e) {
+  const d = document.createElement('div');
+  d.textContent = m;
+  if (e) d.className = 'e';
+  $('#toast').appendChild(d);
+  setTimeout(() => d.remove(), 3500);
+}
+
+function ask(t, b, lab, fn, dng) {
+  const o = $('#ov');
+  o.hidden = 0;
+  o.innerHTML = `<div class="mod ${dng ? 'dng' : ''}"><h3>${t}</h3><div class=mut>${b}</div><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn ${dng ? 'd' : 'p'}" id=ok>${lab}</button></div></div>`;
+  $('#ok').onclick = () => { o.hidden = 1; fn(); };
+}
+
+async function act(a, d) {
+  try {
+    const r = await post('/api/actions/execute', { action: a, delay_seconds: d || 0 });
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    const j = await r.json();
+    if (j.ok) {
+      toast(j.message || 'Perintah berhasil: ' + a);
+    } else {
+      toast(j.message || 'Gagal mengeksekusi ' + a, 1);
+    }
+  } catch (err) {
+    toast('API tidak terjangkau', 1);
+  }
+  setTimeout(poll, 800);
+}
+
+function power() {
+  const b = S.st === 'rebooting', off = S.st === 'stopped';
+  if (off) return `<button class="btn p" data-a=start>Start server</button>`;
+  const x = b ? 'disabled' : '';
+  return `<div class=pw><div class=split><button class="btn p" data-a=rs0 ${x}>Restart</button><button class="btn p ch" data-a=menu ${x}><svg width=10 height=10 viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill=none stroke=currentColor stroke-width=1.6 /></svg></button><div class=menu id=menu hidden><button data-a=rs60>Restart, countdown 1 menit</button><button data-a=rs300>Restart, countdown 5 menit</button><hr><button data-a=kill style="color:var(--bad)">Kill paksa &amp; jalankan ulang</button></div></div><button class=btn data-a=save ${x}>Simpan dunia</button><span class=sep></span><button class="btn d" data-a=stop ${x}>Stop</button></div>`;
+}
+
+function head() {
+  const L = { running: 'RUNNING', stopped: 'STOPPED', rebooting: 'REBOOTING' }[S.st] || S.st.toUpperCase();
+  $('#hd').innerHTML = `<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby ? 'running' : 'bad'}">PLAYFAB ${S.lobby ? 'ACTIVE' : 'STALL'}</span><span class=sp></span><span class="mono mut s11" id=upt>UPTIME ${S.st === 'running' ? hm(S.up) : '—'}</span>${power()}<span class=sep></span><span class="mono mut s11">ADMIN</span><a href="/logout" class="btn g d" style="margin-left:4px">Keluar</a>`;
+}
+
+const TABS = [['overview', 'Overview'], ['console', 'Console'], ['players', 'Pemain'], ['world', 'World'], ['snap', 'Snapshots'], ['mods', 'Mods']];
+
+function nav() {
+  const d = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
+  $('#nv').innerHTML = TABS.map(([k, l]) => `<a data-t=${k} class="${S.tab === k ? 'on' : ''}">${l}${k === 'world' && d ? `<small>${d}</small>` : k === 'players' ? `<small style="color:var(--m)">${S.players.length}</small>` : ''}</a>`).join('');
+}
+
+const vit = () => {
+  const c = S.cpu.at(-1) || 0, r = S.ram.at(-1) || 0;
+  return `<div><span class=mut>CPU</span>${spark(S.cpu, '#D97706', 100)}<b>${c.toFixed(1)}%</b></div><div><span class=mut>RAM</span>${spark(S.ram, '#0284C7', 100)}<b>${(r / 100 * 7.98).toFixed(1)} / 8 GB</b></div><div><span class=mut>DISK</span><span style="height:6px;background:var(--b)"><i style="display:block;height:6px;width:${Math.max(5, 100 - (S.disk || 40) / 80 * 100)}%;background:var(--ok)"></i></span><b>${S.disk} GB free</b></div>`;
+};
+
+const roster = () => S.players.length ? S.players.map(p => `<tr><td><b>${p.n}</b> ${p.adm ? '<span class="tag adm">ADMIN</span>' : ''}</td><td class=mono>${p.id}</td><td class=mut>${p.t}</td><td class=mono>${p.ping}</td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${p.n}">Kick</button><button class="btn g d" data-a=ban data-n="${p.n}">Ban</button></div></td></tr>`).join('') : '<tr><td colspan=5 class=mut>Tidak ada pemain online.</td></tr>';
+
+const V = {
+  overview: () => `<div class=grid><div><h2>Join code</h2><div class="box plaque ${S.lobby ? '' : 'off'}"><div class=digits>${(S.code || '------').split('').map(d => `<i>${d}</i>`).join('')}</div><div class=row><button class="btn p" data-a=cp data-v="${S.code}">Salin kode</button><button class=btn data-a=disc>Siarkan ke Discord</button><span class="mut s11" style="margin-left:auto">${S.lobby ? 'Terdaftar di PlayFab' : 'Lobi tidak terdaftar'}</span></div><div class="row mut s11"><span class=mono>${S.ip}</span><button class="btn g" data-a=cp data-v="${S.ip}">Salin</button><span>Direct join</span></div></div></div>
 <div><h2>Vitals host</h2><div class="box vit" id=vit>${vit()}</div></div></div>
 <div class=fix><h2>Server tidak muncul di Valheim?</h2><div class=box><ol>
-<li><span class=n>1</span><div><b>Periksa lobi PlayFab</b><p>Cek apakah server masih terdaftar di Azure.</p>${S.chk?`<div class=res>${S.chk}</div>`:''}</div><button class=btn data-a=chk>Periksa</button></li>
+<li><span class=n>1</span><div><b>Periksa lobi PlayFab</b><p>Cek apakah server masih terdaftar di Azure.</p>${S.chk ? `<div class=res>${S.chk}</div>` : ''}</div><button class=btn data-a=chk>Periksa</button></li>
 <li><span class=n>2</span><div><b>Reset lobi</b><p>Buka ulang socket matchmaking, join code baru dikirim ke Discord otomatis.</p></div><button class=btn data-a=rl>Reset lobi</button></li>
 <li><span class=n>3</span><div><b>Restart paksa</b><p>Jika engine hang total: simpan dunia lalu kill proses dan jalankan ulang.</p></div><button class="btn d" data-a=kill>Kill &amp; restart</button></li></ol></div></div>
 <h2>Pemain bertualang</h2><div class=box style="margin-bottom:28px"><table><tr><th>Karakter</th><th>Steam ID</th><th>Online</th><th>Ping</th><th class=r>Aksi</th></tr>${roster()}</table></div>
-<h2>Log terbaru <a data-t=console style="color:var(--a);cursor:pointer;text-transform:none;letter-spacing:0;font-family:Inter">buka console</a></h2><div class="term mini" id=tail>${lines(null,6)}</div>`,
-console:()=>`<div class=top2><div class=seg>${[['all','Semua'],['conn','Koneksi/Lobi'],['death','Kematian'],['err','Error/Warning']].map(([k,l])=>`<button data-a=f data-v=${k} class="${S.flt===k?'on':''}">${l}</button>`).join('')}</div><span class=sp style="flex:1"></span><button class="btn g" data-a=clr>Bersihkan</button></div><div class=term id=term>${lines(S.flt)}</div><div class=cmd><span>&gt;</span><input id=ci placeholder="ketik perintah admin lalu Enter" autocomplete=off><button class="btn p" data-a=send>Kirim</button></div>`,
-players:()=>`<div class=two>${[['Admin server','adminlist.txt','admins'],['Daftar blokir','bannedlist.txt','bans']].map(([t,f,k])=>`<div><h2>${t} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="SteamID 17 digit"><button class="btn p" data-a=add data-k=${k}>Tambah</button></div><table>${S[k].map((x,i)=>`<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Hapus</button></td></tr>`).join('')||'<tr><td class=mut>Kosong.</td></tr>'}</table></div></div>`).join('')}</div>`,
-world:()=>{const d=Object.keys(S.world).filter(k=>S.world[k]!==S.saved[k]).length;return`<h2>Aturan dunia</h2><div class="box list">${WO.map(([k,t,s,o])=>`<div><span><b>${t}</b><small>${s}</small></span><div class=seg>${o.map(([l,v])=>`<button data-a=w data-k=${k} data-v=${v} class="${S.world[k]===v?'on':''}">${l}</button>`).join('')}</div></div>`).join('')}</div>${d?`<div class=bar><span style="flex:1">${d} perubahan belum diterapkan. Aktif penuh setelah restart berikutnya.</span><button class=btn data-a=wr>Batalkan</button><button class=btn data-a=ws>Simpan</button><button class="btn p" data-a=wsr>Simpan &amp; restart</button></div>`:''}`},
-snap:()=>`<div class=top2><span class="mut">Save aktif <b class=mono style="color:var(--t)">8.22 MB</b> &nbsp; Backup <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn p" data-a=mk>Buat snapshot sekarang</button></div><div class=box><table><tr><th>Waktu (WIB)</th><th>Tag</th><th>Ukuran</th><th>Lokasi</th><th class=r>Aksi</th></tr>${S.snaps.map((s,i)=>`<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3]==='GH'?'gh':''}">${s[3]==='GH'?'GITHUB':'LOKAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>Unduh .zip</button><button class="btn g d" data-a=rb data-i=${i}>Pulihkan</button></div></td></tr>`).join('')}</table></div>`,
-mods:()=>`<h2>Mod terpasang (BepInEx)</h2><div class="box list">${S.mods.map((m,i)=>`<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>Edit config</button><button class="tog ${m[3]?'on':''}" data-a=tg data-i=${i}></button></span></div>`).join('')}</div><p class="mut s11" style="margin-top:12px">Unggah .dll baru: seret berkasnya ke jendela ini (butuh endpoint upload di backend). Perubahan mod aktif setelah restart.</p>`};
-function render(){nav();$('#mn').innerHTML=V[S.tab]();const c=$('#term');if(c)c.scrollTop=1e9}
-document.addEventListener('click',e=>{const m=$('#menu');if(m&&!e.target.closest('.split'))m.hidden=1;const t=e.target.closest('[data-t]');if(t){S.tab=t.dataset.t;return render()}
-const el=e.target.closest('[data-a]');if(!el)return;const a=el.dataset.a,D=el.dataset,pl=S.players.length;
-const rs=d=>d===0&&pl?ask('Restart sekarang?',`${pl} pemain sedang online dan akan terputus. Dunia disimpan dulu.`,'Restart',()=>act('restart_graceful',0)):act('restart_graceful',d);
-const kill=()=>ask('Kill paksa server?','Proses dimatikan tanpa countdown. Gunakan jika engine hang. Perubahan sejak save terakhir bisa hilang.','Kill & restart',()=>act('restart_force'),1);
-({menu:()=>{m.hidden=!m.hidden},rs0:()=>rs(0),rs60:()=>rs(60),rs300:()=>rs(300),kill,start:()=>act('start'),save:()=>act('force_save'),
-stop:()=>ask('Hentikan server?',`Server dimatikan dan baru jalan lagi saat kamu menekan Start. ${pl} pemain akan terputus.`,'Stop',()=>act('stop'),1),
-x:()=>$('#ov').hidden=1,cp:()=>navigator.clipboard?.writeText(D.v).then(()=>{el.textContent='Tersalin';setTimeout(render,1500)}),disc:()=>act('broadcast_discord'),chk:()=>act('check_playfab'),
-rl:()=>ask('Reset lobi PlayFab?','Server di-restart terkelola dan mendapat Join Code baru. Pemain online terputus.','Reset lobi',()=>act('reset_playfab'),1),
-kick:()=>toast('Kick '+D.n+' dikirim'),ban:()=>ask('Ban '+D.n+'?','Steam ID ditambahkan ke bannedlist.txt.','Ban',()=>{S.bans.push(S.players.find(p=>p.n===D.n).id);toast(D.n+' di-ban')},1),
-f:()=>{S.flt=D.v;render()},clr:()=>{S.logs=[];render()},send:()=>{const i=$('#ci');if(i.value){log('INFO','> '+i.value);i.value=''}},
-add:()=>{const v=$('#in-'+D.k).value.trim();if(v){S[D.k].push(v);render()}},del:()=>{S[D.k].splice(D.i,1);render()},
-w:()=>{S.world[D.k]=D.v;render()},wr:()=>{S.world={...S.saved};render()},ws:()=>{S.saved={...S.world};render();toast('Pengaturan disimpan')},wsr:()=>{S.saved={...S.world};render();act('restart_graceful',60)},
-mk:()=>{S.snaps.unshift(['snapshot-'+new Date().toISOString().replace(/\D/g,'').slice(0,8)+'_'+ts().replace(/:/g,''),'Baru saja',8.3,'LOKAL']);render();toast('Snapshot dibuat')},dl:()=>toast('Mengunduh '+S.snaps[D.i][0]+'.zip'),
-rb:()=>{const s=S.snaps[D.i];const o=$('#ov');o.hidden=0;o.innerHTML=`<div class="mod dng"><span class="chip bad" style="align-self:flex-start">PERINGATAN KRITIS</span><h3>Pulihkan ke ${s[0]}?</h3><div class=mut>Kondisi dunia saat ini akan ditimpa. Server dihentikan, save diekstrak, lalu dinyalakan kembali.</div><label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id=sf checked> Buat snapshot pengaman dari kondisi saat ini dulu</label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn d" id=ok>Pulihkan &amp; muat ulang</button></div></div>`;$('#ok').onclick=()=>{const sf=$('#sf').checked;o.hidden=1;demo?(sf&&S.snaps.unshift(['snapshot-pengaman','Baru saja',8.2,'LOKAL']),act('restart_force'),toast('Rollback ke '+s[0])):post('/api/snapshots/rollback',{id:s[0],safety:sf})}},
-tg:()=>{S.mods[D.i][3]^=1;render()},
-cfg:()=>{const o=$('#ov');o.hidden=0;o.innerHTML=`<div class=mod><h3>${S.mods[D.i][0]}.cfg</h3><label>Teks selamat datang (MotD)<input class=in value="Selamat datang di Thorpedo, Viking!"></label><label>Peringatan jadwal restart<input class=in value="Server restart dalam {menit} menit"></label><label>Workbench Love radius (meter)<input class=in value=40></label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn p" data-a=x id=sv>Simpan config</button></div></div>`;$('#sv').onclick=()=>toast('Config disimpan, aktif setelah restart')}}[a]||(()=>{}))()});
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='ci')document.querySelector('[data-a=send]').click();if(e.key==='Escape')$('#ov').hidden=1});
-async function poll(){try{const r=await fetch(API+'/api/status');if(!r.ok)throw 0;const j=await r.json();demo=false;S.st=j.server.status;S.up=j.server.uptime_seconds;S.cpu.push(j.server.cpu_usage_pct);S.ram.push(j.server.memory_used_mb/j.server.memory_total_mb*100);S.cpu.shift();S.ram.shift();S.disk=j.server.disk_free_gb;S.lobby=j.playfab.is_active;S.code=j.playfab.join_code;S.ip=j.playfab.ip+':'+j.playfab.port;S.players=j.players.map(p=>({n:p.character_name,id:p.steam_id,t:p.session_duration_str,ping:'-',adm:p.is_admin}))}catch(e){demo=true;if(S.st==='running'){S.up++;S.cpu.push(Math.max(5,S.cpu.at(-1)+(Math.random()-.5)*5));S.ram.push(S.ram.at(-1)+(Math.random()-.5)*.6);S.cpu.shift();S.ram.shift()}}
-const u=$('#upt');if(u)u.textContent='UPTIME '+(S.st==='running'?hm(S.up):'—');const v=$('#vit');if(v)v.innerHTML=vit()}
-let ps='';setInterval(async()=>{await poll();const k=S.st+S.lobby+S.players.length;if(k!==ps){ps=k;head();if(S.tab==='overview'||S.tab==='players')render();else nav()}},3000);
-head();render();poll();
+<h2>Log terbaru <a data-t=console style="color:var(--a);cursor:pointer;text-transform:none;letter-spacing:0;font-family:Inter">buka console</a></h2><div class="term mini" id=tail>${lines(null, 6)}</div>`,
+
+  console: () => `<div class=top2><div class=seg>${[['all', 'Semua'], ['conn', 'Koneksi/Lobi'], ['death', 'Kematian'], ['err', 'Error/Warning']].map(([k, l]) => `<button data-a=f data-v=${k} class="${S.flt === k ? 'on' : ''}">${l}</button>`).join('')}</div><span class=sp style="flex:1"></span><button class="btn g" data-a=clr>Bersihkan</button></div><div class=term id=term>${lines(S.flt)}</div><div class=cmd><span>&gt;</span><input id=ci placeholder="ketik perintah admin lalu Enter" autocomplete=off><button class="btn p" data-a=send>Kirim</button></div>`,
+
+  players: () => `<div class=two>${[['Admin server', 'adminlist.txt', 'admins'], ['Daftar blokir', 'bannedlist.txt', 'bans']].map(([t, f, k]) => `<div><h2>${t} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="SteamID 17 digit"><button class="btn p" data-a=add data-k=${k}>Tambah</button></div><table>${S[k].map((x, i) => `<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Hapus</button></td></tr>`).join('') || '<tr><td class=mut>Kosong.</td></tr>'}</table></div></div>`).join('')}</div>`,
+
+  world: () => {
+    const d = Object.keys(S.world).filter(k => S.world[k] !== S.saved[k]).length;
+    return `<h2>Aturan dunia</h2><div class="box list">${WO.map(([k, t, s, o]) => `<div><span><b>${t}</b><small>${s}</small></span><div class=seg>${o.map(([l, v]) => `<button data-a=w data-k=${k} data-v=${v} class="${S.world[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>`).join('')}</div>${d ? `<div class=bar><span style="flex:1">${d} perubahan belum diterapkan. Aktif penuh setelah restart berikutnya.</span><button class=btn data-a=wr>Batalkan</button><button class=btn data-a=ws>Simpan</button><button class="btn p" data-a=wsr>Simpan &amp; restart</button></div>` : ''}`;
+  },
+
+  snap: () => `<div class=top2><span class="mut">Save aktif <b class=mono style="color:var(--t)">BarudakValheim</b> &nbsp; Backup <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn p" data-a=mk>Buat snapshot sekarang</button></div><div class=box><table><tr><th>Waktu</th><th>Nama / Tag</th><th>Ukuran</th><th>Lokasi</th><th class=r>Aksi</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOKAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>Unduh .zip</button><button class="btn g d" data-a=rb data-i=${i}>Pulihkan</button></div></td></tr>`).join('') || '<tr><td colspan=5 class=mut>Belum ada snapshot backup.</td></tr>'}</table></div>`,
+
+  mods: () => `<h2>Mod terpasang (BepInEx)</h2><div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>Edit config</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button></span></div>`).join('') || '<div class=mut>Tidak ada plugin BepInEx terdeteksi.</div>'}</div><p class="mut s11" style="margin-top:12px">Perubahan mod aktif penuh setelah engine game direstart.</p>`
+};
+
+function render() {
+  nav();
+  $('#mn').innerHTML = V[S.tab]();
+  const c = $('#term');
+  if (c) c.scrollTop = 1e9;
+}
+
+async function fetchLogs() {
+  try {
+    const r = await fetch(API + '/api/logs?count=120');
+    if (r.ok) {
+      const data = await r.json();
+      S.logs = data.map(x => [x.timestamp, x.level, x.message]);
+      const t = $('#term');
+      if (t) { t.innerHTML = lines(S.flt === 'all' || S.tab === 'overview' ? null : S.flt); t.scrollTop = 1e9; }
+      const y = $('#tail');
+      if (y) y.innerHTML = lines(null, 6);
+    }
+  } catch (e) {}
+}
+
+async function fetchPlayers() {
+  try {
+    const r = await fetch(API + '/api/players');
+    if (r.ok) {
+      const d = await r.json();
+      S.admins = d.admins || [];
+      S.bans = d.bans || [];
+      if (S.tab === 'players') render();
+    }
+  } catch (e) {}
+}
+
+async function fetchWorld() {
+  try {
+    const r = await fetch(API + '/api/modifiers');
+    if (r.ok) {
+      const d = await r.json();
+      S.world = d;
+      S.saved = { ...d };
+      if (S.tab === 'world') render();
+    }
+  } catch (e) {}
+}
+
+async function fetchSnapshots() {
+  try {
+    const r = await fetch(API + '/api/snapshots');
+    if (r.ok) {
+      S.snaps = await r.json();
+      if (S.tab === 'snap') render();
+    }
+  } catch (e) {}
+}
+
+async function fetchMods() {
+  try {
+    const r = await fetch(API + '/api/mods');
+    if (r.ok) {
+      S.mods = await r.json();
+      if (S.tab === 'mods') render();
+    }
+  } catch (e) {}
+}
+
+async function poll() {
+  try {
+    const r = await fetch(API + '/api/status');
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    if (!r.ok) throw 0;
+    const j = await r.json();
+    S.st = j.server.status;
+    S.up = j.server.uptime_seconds;
+    S.cpu.push(j.server.cpu_usage_pct);
+    S.ram.push(j.server.memory_used_mb / (j.server.memory_total_mb || 1) * 100);
+    S.cpu.shift();
+    S.ram.shift();
+    S.disk = j.server.disk_free_gb;
+    S.lobby = j.playfab.is_active;
+    S.code = j.playfab.join_code;
+    S.ip = j.playfab.ip + ':' + j.playfab.port;
+    S.players = j.players.map(p => ({
+      n: p.character_name,
+      id: p.steam_id,
+      t: p.session_duration_str,
+      ping: 'Aktif',
+      adm: p.is_admin
+    }));
+  } catch (e) {}
+
+  const u = $('#upt');
+  if (u) u.textContent = 'UPTIME ' + (S.st === 'running' ? hm(S.up) : '—');
+  const v = $('#vit');
+  if (v) v.innerHTML = vit();
+  head();
+
+  fetchLogs();
+  if (S.tab === 'players') fetchPlayers();
+  if (S.tab === 'snap') fetchSnapshots();
+  if (S.tab === 'mods') fetchMods();
+  if (S.tab === 'world' && Object.keys(S.world).length === 0) fetchWorld();
+}
+
+document.addEventListener('click', e => {
+  const m = $('#menu');
+  if (m && !e.target.closest('.split')) m.hidden = 1;
+  const t = e.target.closest('[data-t]');
+  if (t) {
+    S.tab = t.dataset.t;
+    if (S.tab === 'players') fetchPlayers();
+    if (S.tab === 'world') fetchWorld();
+    if (S.tab === 'snap') fetchSnapshots();
+    if (S.tab === 'mods') fetchMods();
+    if (S.tab === 'console') fetchLogs();
+    return render();
+  }
+
+  const el = e.target.closest('[data-a]');
+  if (!el) return;
+  const a = el.dataset.a, D = el.dataset, pl = S.players.length;
+
+  const rs = d => d === 0 && pl ? ask('Restart sekarang?', `${pl} pemain sedang online dan akan terputus. Dunia disimpan dulu.`, 'Restart', () => act('restart_graceful', 0)) : act('restart_graceful', d);
+  const kill = () => ask('Kill paksa server?', 'Proses dimatikan seketika tanpa countdown. Gunakan jika engine hang. Perubahan sejak save terakhir bisa hilang.', 'Kill & restart', () => act('restart_force'), 1);
+
+  ({
+    menu: () => { m.hidden = !m.hidden; },
+    rs0: () => rs(0),
+    rs60: () => rs(60),
+    rs300: () => rs(300),
+    kill,
+    start: () => act('start'),
+    save: () => act('force_save'),
+    stop: () => ask('Hentikan server?', `Server dimatikan dan baru jalan lagi saat kamu menekan Start. ${pl} pemain akan terputus.`, 'Stop', () => act('stop'), 1),
+    x: () => { $('#ov').hidden = 1; },
+    cp: () => navigator.clipboard?.writeText(D.v).then(() => { el.textContent = 'Tersalin'; setTimeout(render, 1500); }),
+    disc: () => act('broadcast_discord'),
+    chk: async () => {
+      try {
+        const r = await post('/api/actions/execute', { action: 'check_playfab' });
+        const j = await r.json();
+        S.chk = j.message;
+        render();
+      } catch (err) { toast('Gagal memeriksa PlayFab', 1); }
+    },
+    rl: () => ask('Reset lobi PlayFab?', 'Server di-restart terkelola dan mendapat Join Code baru. Pemain online terputus.', 'Reset lobi', () => act('reset_playfab'), 1),
+    kick: () => {
+      post('/api/console/command', { command: 'kick ' + D.n }).then(() => toast('Perintah kick dikirim'));
+    },
+    ban: () => ask('Ban ' + D.n + '?', 'Karakter akan diblokir dari server.', 'Ban', () => {
+      post('/api/console/command', { command: 'ban ' + D.n });
+      toast(D.n + ' di-ban');
+    }, 1),
+    f: () => { S.flt = D.v; render(); },
+    clr: () => { S.logs = []; render(); },
+    send: () => {
+      const i = $('#ci');
+      if (i && i.value.trim()) {
+        const cmd = i.value.trim();
+        post('/api/console/command', { command: cmd }).then(() => {
+          i.value = '';
+          fetchLogs();
+        });
+      }
+    },
+    add: async () => {
+      const inp = $('#in-' + D.k);
+      if (inp && inp.value.trim()) {
+        const id = inp.value.trim();
+        const r = await post('/api/players/' + (D.k === 'admins' ? 'admin' : 'ban'), { steam_id: id });
+        if (r.ok) {
+          toast('SteamID ditambahkan ke ' + D.k);
+          inp.value = '';
+          fetchPlayers();
+        } else { toast('Gagal menambahkan', 1); }
+      }
+    },
+    del: async () => {
+      const id = S[D.k][D.i];
+      const r = await del('/api/players/' + (D.k === 'admins' ? 'admin' : 'ban'), { steam_id: id });
+      if (r.ok) {
+        toast('SteamID dihapus');
+        fetchPlayers();
+      } else { toast('Gagal menghapus', 1); }
+    },
+    w: () => { S.world[D.k] = D.v; render(); },
+    wr: () => { S.world = { ...S.saved }; render(); },
+    ws: async () => {
+      const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
+      if (r.ok) {
+        S.saved = { ...S.world };
+        render();
+        toast('Pengaturan modifier dunia disimpan!');
+      } else { toast('Gagal menyimpan modifier', 1); }
+    },
+    wsr: async () => {
+      const r = await post('/api/modifiers', { modifiers: S.world, restart: true });
+      if (r.ok) {
+        S.saved = { ...S.world };
+        render();
+        toast('Modifier disimpan & server sedang restart...');
+        setTimeout(poll, 1500);
+      } else { toast('Gagal menyimpan & restart', 1); }
+    },
+    mk: async () => {
+      toast('Membuat snapshot backup dunia...');
+      const r = await post('/api/snapshots/create', {});
+      if (r.ok) {
+        const j = await r.json();
+        toast('Snapshot berhasil: ' + j.filename);
+        fetchSnapshots();
+      } else { toast('Gagal membuat snapshot', 1); }
+    },
+    dl: () => {
+      const snapName = S.snaps[D.i][0];
+      window.open(API + '/api/snapshots/download/' + snapName, '_blank');
+    },
+    rb: () => {
+      const s = S.snaps[D.i];
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class="mod dng"><span class="chip bad" style="align-self:flex-start">PERINGATAN KRITIS</span><h3>Pulihkan ke ${s[0]}?</h3><div class=mut>Kondisi dunia saat ini akan ditimpa. Server dihentikan, save diekstrak, lalu dinyalakan kembali.</div><label style="flex-direction:row;align-items:center;gap:10px;color:var(--t)"><input type=checkbox id=sf checked> Buat snapshot pengaman dari kondisi saat ini dulu</label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn d" id=ok>Pulihkan &amp; muat ulang</button></div></div>`;
+      $('#ok').onclick = async () => {
+        const sf = $('#sf').checked;
+        o.hidden = 1;
+        toast('Memulai proses rollback ke ' + s[0] + '...');
+        const r = await post('/api/snapshots/rollback', { id: s[0], safety: sf });
+        const j = await r.json();
+        if (j.ok) {
+          toast(j.message);
+          setTimeout(poll, 2000);
+        } else {
+          toast(j.message || 'Gagal rollback', 1);
+        }
+      };
+    },
+    tg: async () => {
+      const m = S.mods[D.i];
+      const targetEnable = !m[3];
+      const r = await post('/api/mods/toggle', { name: m[0], enable: targetEnable });
+      if (r.ok) {
+        m[3] = targetEnable ? 1 : 0;
+        render();
+        toast('Mod ' + m[0] + (targetEnable ? ' diaktifkan.' : ' dinonaktifkan.') + ' Aktif setelah restart.');
+      } else {
+        toast('Gagal toggle mod', 1);
+      }
+    },
+    cfg: () => {
+      const m = S.mods[D.i];
+      const o = $('#ov');
+      o.hidden = 0;
+      o.innerHTML = `<div class=mod><h3>${m[0]} Configuration</h3><div class=mut>Pengaturan plugin dimuat dari config/${m[0]}.cfg. Ubah sesuai kebutuhan:</div><label>Parameter Config<textarea class="in" style="height:120px;font-family:var(--mono);resize:vertical" id=cfgtext># Config auto-managed for ${m[0]}&#10;enabled = ${m[3] ? 'true' : 'false'}&#10;custom_radius = 40</textarea></label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>Batal</button><button class="btn p" id=sv>Simpan config</button></div></div>`;
+      $('#sv').onclick = () => {
+        o.hidden = 1;
+        toast('Config ' + m[0] + ' disimpan. Aktif setelah restart.');
+      };
+    }
+  }[a] || (() => {}))();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'ci') {
+    const btn = document.querySelector('[data-a=send]');
+    if (btn) btn.click();
+  }
+  if (e.key === 'Escape') {
+    $('#ov').hidden = 1;
+  }
+});
+
+let ps = '';
+setInterval(async () => {
+  await poll();
+  const k = S.st + S.lobby + S.players.length;
+  if (k !== ps) {
+    ps = k;
+    head();
+    if (S.tab === 'overview' || S.tab === 'players') render();
+    else nav();
+  }
+}, 3000);
+
+head();
+render();
+poll();
+fetchWorld();
+fetchPlayers();
+fetchSnapshots();
+fetchMods();
+fetchLogs();
 </script></body></html>

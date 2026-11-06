@@ -181,6 +181,7 @@ class GameServerManager:
             try:
                 self.process = subprocess.Popen(
                     cmd,
+                    stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -264,6 +265,22 @@ class GameServerManager:
             self.status = "stopped"
             self.playfab_active = False
             self.players = []
+        return True
+
+    def send_command(self, command: str) -> bool:
+        cmd = command.strip()
+        if not cmd:
+            return False
+        self._handle_log_line(f"> {cmd}")
+        with self._lock:
+            if self.process and self.process.poll() is None and self.process.stdin:
+                try:
+                    self.process.stdin.write(f"{cmd}\n")
+                    self.process.stdin.flush()
+                    return True
+                except Exception as e:
+                    self._handle_log_line(f"Failed to write to stdin: {e}")
+                    return False
         return True
 
     def get_status(self) -> Dict[str, Any]:
