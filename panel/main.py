@@ -20,7 +20,21 @@ import services
 AUTH_ENABLED = os.getenv("AUTH_ENABLED", "false").lower() == "true"
 PANEL_PORT = int(os.getenv("PANEL_PORT", "28456"))
 
-app = FastAPI(title="Thorpedo Valheim Panel")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-start Valheim game engine on container boot if binary exists
+    binary = os.getenv("VALHEIM_BINARY", "/valheim/valheim_server.x86_64")
+    if os.path.exists(binary) and os.getenv("AUTO_START_GAME", "true").lower() == "true":
+        print("==> Auto-starting Valheim dedicated server engine via supervisor...")
+        GameServerManager.get_instance().start()
+    yield
+    # Graceful flush on container stop
+    print("==> Container stopping: flushing Valheim world saves...")
+    GameServerManager.get_instance().stop(timeout=30)
+
+app = FastAPI(title="Thorpedo Valheim Panel", lifespan=lifespan)
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 # Initialize admin credentials on boot

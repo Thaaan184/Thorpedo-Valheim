@@ -163,12 +163,20 @@ class GameServerManager:
 
             cmd = self.build_command()
             env = os.environ.copy()
-            # BepInEx dynamic loader setup if present
-            bepinex_dir = os.getenv("BEPINEX_DIR", "/valheim/BepInEx")
-            if os.path.exists(bepinex_dir):
-                env["DO_NOT_STYLE_OUTPUT"] = "1"
-                env["LD_LIBRARY_PATH"] = f"/valheim/doorstop_libs:{env.get('LD_LIBRARY_PATH', '')}"
-                env["LD_PRELOAD"] = "libdoorstop.so"
+            # BepInEx Doorstop loader setup if present
+            install_dir = os.getenv("INSTALL_DIR", "/valheim")
+            bepinex_dir = os.path.join(install_dir, "BepInEx")
+            if os.path.exists(bepinex_dir) or os.getenv("BEPINEX", "false").lower() == "true":
+                env["DOORSTOP_ENABLED"] = "1"
+                env["DOORSTOP_TARGET_ASSEMBLY"] = f"{install_dir}/BepInEx/core/BepInEx.Preloader.dll"
+                old_preload = env.get("LD_PRELOAD", "")
+                env["LD_PRELOAD"] = f"libdoorstop_x64.so:{old_preload}" if old_preload else "libdoorstop_x64.so"
+                old_libpath = env.get("LD_LIBRARY_PATH", "")
+                env["LD_LIBRARY_PATH"] = f"{install_dir}/doorstop_libs:{install_dir}/linux64:{old_libpath}"
+
+            env["SteamAppId"] = "892970"
+
+            working_dir = install_dir if os.path.exists(install_dir) else None
 
             try:
                 self.process = subprocess.Popen(
@@ -177,7 +185,8 @@ class GameServerManager:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    env=env
+                    env=env,
+                    cwd=working_dir
                 )
                 self.status = "running"
                 self.start_time = time.time()
