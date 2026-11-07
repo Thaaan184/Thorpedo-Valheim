@@ -84,6 +84,7 @@ def test_api_players_endpoints(auth_client):
     res = auth_client.get("/api/players")
     assert res.status_code == 200
     data = res.json()
+    assert "active_players" in data
     assert "76561199999999999" in data["admins"]
     
     res = auth_client.request("DELETE", "/api/players/admin", json={"steam_id": "76561199999999999"})

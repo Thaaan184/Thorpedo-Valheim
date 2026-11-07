@@ -116,19 +116,37 @@ class GameServerManager:
             with self._lock:
                 existing = next((p for p in self.players if p.get("character_name") == name), None)
                 if not existing:
-                    self.players.append({
+                    new_p = {
                         "character_name": name,
                         "steam_id": "-",
                         "session_start": time.time(),
                         "session_duration_str": "Just joined",
                         "is_admin": False
-                    })
+                    }
+                    self.players.append(new_p)
                     self._handle_log_line(f"Player '{name}' joined the world (online: {len(self.players)})")
+                    ctx = self._get_context_dict()
+                    ctx["character_name"] = name
+                    ctx["steam_name"] = name
+                    dispatch_discord_event("player_join", ctx)
 
-        # Parse player leaves
-        if any(k in line.lower() for k in ["closing socket", "destroying abandoned non persistent zdo"]):
-            # If socket closed and we have players, check if someone left
-            pass
+        # Parse player leaves / disconnects
+        match_disconnect = re.search(r"Closing socket\s+(\d+)", line, re.IGNORECASE) or re.search(r"destroying abandoned non persistent zdo.*?owner\s*:\s*(\d+)", line, re.IGNORECASE)
+        if match_disconnect:
+            # Check if any player session needs to be cleaned up
+            with self._lock:
+                if self.players:
+                    leaving_p = self.players.pop(0)
+                    char_name = leaving_p.get("character_name", "Ksatria")
+                    dur_secs = int(time.time() - leaving_p.get("session_start", time.time()))
+                    h, m = divmod(dur_secs, 3600)
+                    m, s = divmod(m, 60)
+                    dur_str = f"{h} jam {m} menit {s} detik" if h else f"{m} menit {s} detik"
+                    self._handle_log_line(f"Player '{char_name}' left the world (duration: {dur_str})")
+                    ctx = self._get_context_dict()
+                    ctx["character_name"] = char_name
+                    ctx["duration_str"] = dur_str
+                    dispatch_discord_event("player_leave", ctx)
 
     def _get_context_dict(self) -> Dict[str, Any]:
         with self._lock:
@@ -143,7 +161,8 @@ class GameServerManager:
                 "max_players": os.getenv("MAX_PLAYERS", "5"),
                 "join_code": self.playfab_join_code or "—",
                 "access_password": pwd,
-                "server_version": "1.0+"
+                "server_version": "1.0+",
+                "snapshot_tag": "latest"
             }
 
     def _read_stdout(self, proc: subprocess.Popen):

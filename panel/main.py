@@ -267,7 +267,10 @@ async def upload_mod_api(file: UploadFile = File(...), user: str = Depends(requi
 
 @app.get("/api/players")
 async def get_players_data(user: str = Depends(require_auth)):
+    mgr = GameServerManager.get_instance()
+    st = mgr.get_status()
     return {
+        "active_players": st.get("players", []),
         "admins": services.get_admin_list(),
         "bans": services.get_banned_list()
     }

@@ -189,6 +189,60 @@ def get_snapshots() -> List[List[Any]]:
 
     return snaps
 
+def upload_to_github_release(zip_path: str, tag_name: str) -> Dict[str, Any]:
+    settings = settings_manager.load_settings()
+    gh = settings.get("github", {})
+    token = gh.get("token") or os.getenv("GITHUB_TOKEN")
+    repo = gh.get("repo") or os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
+
+    if not token or token.startswith("your_") or not repo or "/" not in repo:
+        return {"ok": False, "message": "GitHub token or repository not properly configured in Settings."}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "Thorpedo-Panel/2.0"
+    }
+
+    # 1. Create Release
+    rel_url = f"https://api.github.com/repos/{repo}/releases"
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S UTC")
+    payload = {
+        "tag_name": tag_name,
+        "target_commitish": "main",
+        "name": f"World Snapshot • {tag_name}",
+        "body": f"Automated Thorpedo Valheim World Snapshot\n\n- **Timestamp:** {now_str}\n- **Source:** Thorpedo Autonomous Control Suite",
+        "draft": False,
+        "prerelease": False
+    }
+
+    try:
+        r = requests.post(rel_url, json=payload, headers=headers, timeout=12)
+        if r.status_code not in [200, 201]:
+            return {"ok": False, "message": f"GitHub release creation failed: HTTP {r.status_code} {r.text[:100]}"}
+        rel_data = r.json()
+        upload_url = rel_data.get("upload_url", "").split("{")[0]
+
+        # 2. Upload asset
+        fname = os.path.basename(zip_path)
+        asset_url = f"{upload_url}?name={fname}"
+        with open(zip_path, "rb") as f:
+            file_bytes = f.read()
+
+        up_headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/zip",
+            "Content-Length": str(len(file_bytes)),
+            "User-Agent": "Thorpedo-Panel/2.0"
+        }
+        ur = requests.post(asset_url, data=file_bytes, headers=up_headers, timeout=60)
+        if ur.status_code in [200, 201]:
+            get_manager()._handle_log_line(f"Snapshot uploaded to GitHub Release: {tag_name}")
+            return {"ok": True, "message": f"Successfully published to GitHub Release '{tag_name}'"}
+        return {"ok": False, "message": f"Asset upload failed: HTTP {ur.status_code} {ur.text[:100]}"}
+    except Exception as e:
+        return {"ok": False, "message": f"GitHub release error: {str(e)}"}
+
 def clean_old_snapshots(retention_count: int):
     if retention_count <= 0:
         return
@@ -262,10 +316,16 @@ def create_snapshot() -> Dict[str, Any]:
         retention = settings.get("server", {}).get("retention_count", 10)
         clean_old_snapshots(retention)
 
+        # Push to GitHub Release if configured
+        gh_cfg = settings.get("github", {})
+        if gh_cfg.get("auto_upload_releases") and gh_cfg.get("token") and not gh_cfg.get("token", "").startswith("your_"):
+            upload_to_github_release(out_path, f"snapshot-{timestamp}")
+
         # Dispatch Discord success notification
         ctx = mgr._get_context_dict()
         ctx["filename"] = fname
         ctx["size_mb"] = str(size_mb)
+        ctx["snapshot_tag"] = f"snapshot-{timestamp}"
         dispatch_discord_event("backup_success", ctx)
 
         return {

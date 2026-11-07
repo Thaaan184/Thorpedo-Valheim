@@ -10,7 +10,11 @@ nav{border-right:1px solid var(--b);background:var(--s);padding:12px 0;display:f
 .nav-links{display:flex;flex-direction:column}
 nav a{display:flex;justify-content:space-between;padding:9px 20px;color:var(--m);cursor:pointer;border-left:2px solid transparent;text-decoration:none}
 nav a:hover{color:var(--t)}nav a.on{color:var(--t);border-color:var(--a);background:var(--bg)}nav small{font:11px var(--mono);color:var(--a)}
-.lang-box{padding:12px 14px;border-top:1px solid var(--b)}
+#top-bar{position:fixed;top:0;left:0;right:0;height:3px;background:var(--p);transform:translateX(-100%);transition:transform .3s ease;z-index:99999}
+#top-bar.active{transform:translateX(0);animation:topbar-pulse 1.2s infinite ease-in-out}
+@keyframes topbar-pulse{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
+.btn.loading{opacity:.7;pointer-events:none;position:relative}
+.btn.loading::after{content:'...'}
 .lang-pill{display:flex;background:var(--s2);border:1px solid var(--b);border-radius:4px;overflow:hidden;padding:2px}
 .lang-opt{flex:1;background:none;border:0;color:var(--m);font:600 11px Inter,sans-serif;padding:6px 2px;cursor:pointer;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:4px;transition:0.15s}
 .lang-opt:hover{color:var(--t)}.lang-opt.active{background:var(--bg);color:var(--a);box-shadow:0 1px 3px #0006}
@@ -53,7 +57,7 @@ input.in,select.in,textarea.in{background:var(--bg);border:1px solid var(--b);co
 .card-head h3{font:700 13px var(--mono);color:var(--t)}
 #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:60}#toast div{background:var(--s2);border:1px solid var(--b);border-left:3px solid var(--ok);padding:10px 14px;font-size:12px}#toast .e{border-left-color:var(--bad)}
 @media(max-width:860px){ #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}header{flex-wrap:wrap;padding:10px 14px}nav{display:flex;overflow:auto;border:0;border-bottom:1px solid var(--b)}nav a{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}nav a.on{border-color:var(--a)}.grid,.two{grid-template-columns:1fr}main{padding:16px 14px 90px}.digits i{width:40px;font-size:34px}}
-</style></head><body><div id="app"><header id="hd"></header><nav id="nv"><div class="nav-links" id="nl"></div><div class="lang-box" id="lb"></div></nav><main id="mn"></main></div>
+</style></head><body><div id="top-bar"></div><div id="app"><header id="hd"></header><nav id="nv"><div class="nav-links" id="nl"></div><div class="lang-box" id="lb"></div></nav><main id="mn"></main></div>
 <div class="ov" id="ov" hidden></div><div id="toast"></div>
 <input type="file" id="file-world" style="display:none" accept=".db,.fwl,.zip">
 <input type="file" id="file-mod" style="display:none" accept=".dll,.zip">
@@ -205,8 +209,33 @@ const spark = (a, c, mx) => {
   return `<svg class=sl viewBox="0 0 100 26" preserveAspectRatio="none"><polyline points="${p}" fill="none" stroke="${c}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 };
 
-const post = (p, b) => fetch(API + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-const del = (p, b) => fetch(API + p, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+function setProgress(active) {
+  const bar = $('#top-bar');
+  if (bar) {
+    if (active) bar.classList.add('active');
+    else bar.classList.remove('active');
+  }
+}
+
+async function post(p, b) {
+  setProgress(true);
+  try {
+    const res = await fetch(API + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) });
+    return res;
+  } finally {
+    setProgress(false);
+  }
+}
+
+async function del(p, b) {
+  setProgress(true);
+  try {
+    const res = await fetch(API + p, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) });
+    return res;
+  } finally {
+    setProgress(false);
+  }
+}
 
 function toast(m, e) {
   const d = document.createElement('div');
@@ -224,6 +253,7 @@ function ask(title, body, lab, fn, dng) {
 }
 
 async function act(a, d) {
+  setProgress(true);
   try {
     const r = await post('/api/actions/execute', { action: a, delay_seconds: d || 0 });
     if (r.status === 401) { window.location.href = '/login'; return; }
@@ -235,6 +265,8 @@ async function act(a, d) {
     }
   } catch (err) {
     toast('API connection error', 1);
+  } finally {
+    setProgress(false);
   }
   setTimeout(poll, 800);
 }
@@ -358,7 +390,28 @@ const V = {
 ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsavedBar')}</span><button class=btn data-a=wr>${t('discardBtn')}</button><button class=btn data-a=ws>${t('saveBtn')}</button><button class="btn p" data-a=wsr>${t('saveRestartBtn')}</button></div>` : ''}`;
   },
 
-  players: () => `<div class=two>${[['Server Administrators', 'adminlist.txt', 'admins'], ['Blocked Steam Accounts', 'bannedlist.txt', 'bans']].map(([title, f, k]) => `<div><h2>${title} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="17-digit SteamID (7656...)"><button class="btn p" data-a=add data-k=${k}>Add</button></div><table>${S[k].map((x, i) => `<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Remove</button></td></tr>`).join('') || '<tr><td class=mut>List is empty.</td></tr>'}</table></div></div>`).join('')}</div>`,
+  players: () => {
+    const act = S.active_players || [];
+    return `<div style="display:flex;flex-direction:column;gap:18px">
+      <div>
+        <h2>⚔️ ${t('activeWarriors') || 'Active Warriors Online'} <span class="tag ${act.length ? 'ok' : ''}" style="margin-left:8px">${act.length} ONLINE</span></h2>
+        <div class=box>
+          <table>
+            <tr><th>Character Name</th><th>Steam ID</th><th>Duration in Realm</th><th>Session State</th><th class=r>Quick Action</th></tr>
+            ${act.map(p => `<tr>
+              <td><b style="color:var(--t)">${p.character_name}</b></td>
+              <td class=mono>${p.steam_id || 'Crossplay'}</td>
+              <td class=mono>${p.session_duration_str || 'Online'}</td>
+              <td><span class="tag ok">EXPLORING</span></td>
+              <td class=r><button class="btn g d" data-a=kickply data-id="${p.character_name}">Kick</button></td>
+            </tr>`).join('') || '<tr><td colspan=5 class=mut style="padding:14px">Hening di Sacrificial Stones... Belum ada ksatria (0 Online).</td></tr>'}
+          </table>
+        </div>
+      </div>
+
+      <div class=two>${[['Server Administrators', 'adminlist.txt', 'admins'], ['Blocked Steam Accounts', 'bannedlist.txt', 'bans']].map(([title, f, k]) => `<div><h2>${title} <span style="text-transform:none;letter-spacing:0" class=mono>${f}</span></h2><div class=box><div class=add><input class=in id=in-${k} placeholder="17-digit SteamID (7656...)"><button class="btn p" data-a=add data-k=${k}>Add</button></div><table>${S[k].map((x, i) => `<tr><td class=mono>${x}</td><td class=r><button class="btn g d" data-a=del data-k=${k} data-i=${i}>Remove</button></td></tr>`).join('') || '<tr><td class=mut>List is empty.</td></tr>'}</table></div></div>`).join('')}</div>
+    </div>`;
+  },
 
   snap: () => `<div class=top2><span class="mut">${t('activeWorld')} <b class=mono style="color:var(--t)">${S.srvName}</b> &nbsp; ${t('snapshotsCount')} <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn" data-a=upworld>${t('uploadWorldBtn')}</button><button class="btn p" data-a=mk>${t('createSnapBtn')}</button></div><div class=box><table><tr><th>${t('timeCol')}</th><th>${t('nameCol')}</th><th>${t('sizeCol')}</th><th>${t('locCol')}</th><th class=r>${t('actCol')}</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOCAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>${t('downloadBtn')}</button><button class="btn g d" data-a=rb data-i=${i}>${t('rollbackBtn')}</button></div></td></tr>`).join('') || `<tr><td colspan=5 class=mut>${t('noSnaps')}</td></tr>`}</table></div>`,
 
@@ -461,6 +514,7 @@ async function fetchPlayers() {
     const r = await fetch(API + '/api/players');
     if (r.ok) {
       const d = await r.json();
+      S.active_players = d.active_players || [];
       S.admins = d.admins || [];
       S.bans = d.bans || [];
       if (S.tab === 'players') render();
@@ -599,12 +653,14 @@ document.addEventListener('click', e => {
     cp: () => navigator.clipboard?.writeText(D.v).then(() => { el.textContent = t('copied'); setTimeout(render, 1500); }),
     disc: () => act('broadcast_discord'),
     chk: async () => {
+      setProgress(true);
       try {
         const r = await post('/api/actions/execute', { action: 'check_playfab' });
         const j = await r.json();
         S.chk = j.message;
         render();
       } catch (err) { toast('Failed to probe PlayFab lobby', 1); }
+      finally { setProgress(false); }
     },
     rl: () => ask('Reset Matchmaking Lobby?', 'Server reboots gracefully and rotates PlayFab Join Code.', 'Reset Lobby', () => act('reset_playfab'), 1),
     kick: () => {
@@ -651,45 +707,55 @@ document.addEventListener('click', e => {
       render();
     },
     savesrv: async () => {
-      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
-      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
-      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
-      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
-      const r = await post('/api/server/config', {
-        name: srvName,
-        password: srvPass,
-        auto_backup_enabled: S.serverConf.auto_backup_enabled,
-        auto_backup_interval_hours: srvFreq,
-        retention_count: srvRet,
-        restart: false
-      });
-      if (r.ok) {
-        S.serverConf = { ...S.serverConf, name: srvName, password: srvPass, auto_backup_interval_hours: srvFreq, retention_count: srvRet };
-        S.serverConfSaved = { ...S.serverConf };
-        toast('Server configuration saved!');
-        render();
-      } else {
-        toast('Failed to save server config', 1);
+      setProgress(true);
+      try {
+        const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
+        const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
+        const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
+        const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
+        const r = await post('/api/server/config', {
+          name: srvName,
+          password: srvPass,
+          auto_backup_enabled: S.serverConf.auto_backup_enabled,
+          auto_backup_interval_hours: srvFreq,
+          retention_count: srvRet,
+          restart: false
+        });
+        if (r.ok) {
+          S.serverConf = { ...S.serverConf, name: srvName, password: srvPass, auto_backup_interval_hours: srvFreq, retention_count: srvRet };
+          S.serverConfSaved = { ...S.serverConf };
+          toast('Server configuration saved!');
+          render();
+        } else {
+          toast('Failed to save server config', 1);
+        }
+      } finally {
+        setProgress(false);
       }
     },
     savesrvrestart: async () => {
-      const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
-      const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
-      const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
-      const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
-      const r = await post('/api/server/config', {
-        name: srvName,
-        password: srvPass,
-        auto_backup_enabled: S.serverConf.auto_backup_enabled,
-        auto_backup_interval_hours: srvFreq,
-        retention_count: srvRet,
-        restart: true
-      });
-      if (r.ok) {
-        toast('Server config saved. Rebooting server...');
-        setTimeout(poll, 1500);
-      } else {
-        toast('Failed to save and restart', 1);
+      setProgress(true);
+      try {
+        const srvName = $('#cfg-srv-name')?.value || S.serverConf.name;
+        const srvPass = $('#cfg-srv-pass')?.value || S.serverConf.password;
+        const srvFreq = parseInt($('#cfg-srv-freq')?.value || S.serverConf.auto_backup_interval_hours);
+        const srvRet = parseInt($('#cfg-srv-ret')?.value || S.serverConf.retention_count);
+        const r = await post('/api/server/config', {
+          name: srvName,
+          password: srvPass,
+          auto_backup_enabled: S.serverConf.auto_backup_enabled,
+          auto_backup_interval_hours: srvFreq,
+          retention_count: srvRet,
+          restart: true
+        });
+        if (r.ok) {
+          toast('Server config saved. Rebooting server...');
+          setTimeout(poll, 1500);
+        } else {
+          toast('Failed to save and restart', 1);
+        }
+      } finally {
+        setProgress(false);
       }
     },
     delmod: () => {
@@ -712,29 +778,44 @@ document.addEventListener('click', e => {
       render();
     },
     ws: async () => {
-      const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
-      if (r.ok) {
-        S.saved = { ...S.world };
-        toast('Gameplay modifiers saved!');
-        render();
-      } else { toast('Failed to save modifiers', 1); }
+      setProgress(true);
+      try {
+        const r = await post('/api/modifiers', { modifiers: S.world, restart: false });
+        if (r.ok) {
+          S.saved = { ...S.world };
+          toast('Gameplay modifiers saved!');
+          render();
+        } else { toast('Failed to save modifiers', 1); }
+      } finally {
+        setProgress(false);
+      }
     },
     wsr: async () => {
-      const r = await post('/api/modifiers', { modifiers: S.world, restart: true });
-      if (r.ok) {
-        S.saved = { ...S.world };
-        toast('Modifiers saved. Server is restarting to apply changes...');
-        setTimeout(poll, 1500);
-      } else { toast('Failed to save and restart', 1); }
+      setProgress(true);
+      try {
+        const r = await post('/api/modifiers', { modifiers: S.world, restart: true });
+        if (r.ok) {
+          S.saved = { ...S.world };
+          toast('Modifiers saved. Rebooting server...');
+          setTimeout(poll, 1500);
+        } else { toast('Failed to save modifiers', 1); }
+      } finally {
+        setProgress(false);
+      }
     },
     mk: async () => {
-      toast('Creating world snapshot archive...');
-      const r = await post('/api/snapshots/create', {});
-      if (r.ok) {
-        const j = await r.json();
-        toast('Snapshot created: ' + j.filename);
-        fetchSnapshots();
-      } else { toast('Snapshot creation failed', 1); }
+      setProgress(true);
+      try {
+        toast('Creating world snapshot archive...');
+        const r = await post('/api/snapshots/create', {});
+        if (r.ok) {
+          const j = await r.json();
+          toast('Snapshot created: ' + j.filename);
+          fetchSnapshots();
+        } else { toast('Snapshot creation failed', 1); }
+      } finally {
+        setProgress(false);
+      }
     },
     dl: () => {
       const snapName = S.snaps[D.i][0];
@@ -915,6 +996,8 @@ document.addEventListener('click', e => {
           server_crash: $('#ev-crash').checked,
           server_recovery: $('#ev-recovery').checked,
           join_code_rotated: $('#ev-rotated').checked,
+          player_join: true,
+          player_leave: true,
           backup_success: $('#ev-backup-ok').checked,
           backup_failed: $('#ev-backup-fail').checked
         };
@@ -943,6 +1026,14 @@ document.addEventListener('click', e => {
           toast('Failed to save settings', 1);
         }
       };
+    },
+    kickply: () => {
+      const plyName = D.id;
+      ask(`Kick ${plyName}?`, `Kick ${plyName} from the current realm session.`, 'Kick', async () => {
+        await post('/api/console/command', { command: `kick ${plyName}` });
+        toast(`Command 'kick ${plyName}' sent.`);
+        fetchPlayers();
+      }, 1);
     },
     cfggh: () => {
       const gh = S.settings.github || {};

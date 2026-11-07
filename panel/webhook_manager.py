@@ -16,45 +16,59 @@ PLACEHOLDERS = [
     "max_players",
     "world_name",
     "server_version",
-    "timestamp"
+    "timestamp",
+    "character_name",
+    "steam_name",
+    "duration_str",
+    "snapshot_tag"
 ]
 
 def get_default_templates() -> Dict[str, Dict[str, str]]:
     return {
         "server_ready": {
-            "title": "⚔️ {server_name} IS READY!",
-            "description": "The gates of Midgard are open! The server is online and ready for adventurers.\n\n**Server:** {server_name}\n**Status:** {server_status}\n**Players:** {online_players}/{max_players}\n**Join Code:** `{join_code}`\n**Access Password:** `{access_password}`\n\nHave fun!",
-            "footer": "Thorpedo Autonomous Sentinel • Private Valheim Stack"
+            "title": "ᛞ・Gerbang Thorpedo Terbuka",
+            "description": "Kabut Dunia Kesepuluh mereda. Gerbang menuju medan tempur telah dibuka oleh Allfather.\n\n**🔑 Kunci Gerbang (Join Code):** `{join_code}`\n**🔒 Mantra Sandi (Password):** `{access_password}`\n\n**⚙️ Berkah Alam (Modifiers):**\n• Hasil Alam & Buruan: 2x Lipat\n• Gerbang Portal: Bebas Ore & Logam\n• Serbuan Monster: Sesuai Jejak Ksatria\n\n**📜 Titah Masuk:**\nBuka Valheim → **Join Game** → klik **Add Server** → masukkan Join Code & Password.\n*(Untuk pemain non-Steam/tani gunakan Join Code, bukan Join IP)*\n\n**🔄 Siklus Pemulihan Alam:**\nTiap 6 jam (Auto-Save & Sentinel Active)\n**📦 Snapshot Dunia:** `{snapshot_tag}`",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "server_offline": {
-            "title": "🛑 {server_name} is Offline",
-            "description": "The dedicated server has been stopped. World chunks have been saved safely to disk.",
-            "footer": "Thorpedo Valheim Sentinel"
+            "title": "🛑・Gerbang Thorpedo Ditutup",
+            "description": "Allfather menutup gerbang dunia kesepuluh. Seluruh jejak ksatria dan bongkahan tanah telah diabadikan ke batu rune (Safe Chunk Flush).",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "server_crash": {
-            "title": "⚠️ {server_name} Unexpected Termination",
-            "description": "Game server engine stopped unexpectedly. Automatic crash recovery supervisor is initiating reboot.",
-            "footer": "Thorpedo Self-Healing Supervisor"
+            "title": "⚠️・Guncangan Hebat di Dunia Kesepuluh",
+            "description": "Pohon dunia Yggdrasil bergetar hebat (Game engine crash). Pasukan gagak Hugin sedang bersiap membangkitkan kembali alam semesta.",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "server_recovery": {
-            "title": "🔄 {server_name} Auto-Recovered",
-            "description": "Supervisor successfully restarted the Valheim engine after unexpected downtime.",
-            "footer": "Thorpedo Self-Healing Supervisor"
+            "title": "🔄・Alam Semesta Telah Dipulihkan",
+            "description": "Allfather telah memulihkan stabilitas Valheim. Gerbang kembali terbuka untuk para pejuang tangguh.",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "join_code_rotated": {
-            "title": "🔑 PlayFab Join Code Rotated: {join_code}",
-            "description": "A new Microsoft PlayFab matchmaking lobby has been established for **{server_name}**.\n\n**Join Code:** `{join_code}`\n**Access Password:** `{access_password}`",
-            "footer": "Thorpedo Matchmaking Sentinel"
+            "title": "🔑・Kunci Gerbang Baru Ditempa: {join_code}",
+            "description": "Allfather memperbarui kunci gerbang PlayFab untuk masuk ke **{server_name}**.\n\n**🔑 Kunci Gerbang:** `{join_code}`\n**🔒 Mantra Sandi:** `{access_password}`",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
+        },
+        "player_join": {
+            "title": "ᛟ・Ksatria Tiba di Tanah Thorpedo",
+            "description": "Sayap Valkyrie menurunkan seorang pejuang di lingkar batu pengorbanan.\n\n**⚔️ Karakter:** **{character_name}**\n**ᚦ Asal Pejuang:** `{steam_name}`\n**⏳ Waktu:** {timestamp}",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
+        },
+        "player_leave": {
+            "title": "ᛗ・Ksatria Berteduh di Perapian",
+            "description": "Senjata disandarkan pada dinding kayu. Pejuang menikmati hangatnya api unggun.\n\n**⚔️ Karakter:** **{character_name}**\n**⏳ Durasi Mengarungi Rimba:** {duration_str}\n**🏕️ Status:** Rested / Offline",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "backup_success": {
-            "title": "💾 World Snapshot Verified & Saved",
-            "description": "Automated backup for world **{world_name}** completed and verified successfully.\n\n**Timestamp:** {timestamp}",
-            "footer": "Thorpedo Disaster Recovery Engine"
+            "title": "🛡️・Penyucian Alam Semesta Selesai",
+            "description": "Seluruh jejak dunia **{world_name}** diabadikan ke dalam batu rune (Backup Aman & Terverifikasi).\n\n**📦 Snapshot:** `{snapshot_tag}`\n**⏳ Waktu:** {timestamp}",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         },
         "backup_failed": {
-            "title": "❌ World Backup Error",
-            "description": "Automated snapshot generation failed. Check server disk space and logs.",
-            "footer": "Thorpedo Disaster Recovery Engine"
+            "title": "❌・Penyucian Alam Gagal",
+            "description": "Batu rune retak saat menyimpan snapshot dunia kesepuluh. Periksa kapasitas disk host segera.",
+            "footer": "Thorpedo Realm • Dikabarkan oleh Hugin"
         }
     }
 
