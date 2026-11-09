@@ -1030,8 +1030,8 @@ document.addEventListener('click', e => {
     kickply: () => {
       const plyName = D.id;
       ask(`Kick ${plyName}?`, `Kick ${plyName} from the current realm session.`, 'Kick', async () => {
-        await post('/api/console/command', { command: `kick ${plyName}` });
-        toast(`Command 'kick ${plyName}' sent.`);
+        await post('/api/players/kick', { steam_id: plyName });
+        toast(`Player '${plyName}' kicked.`);
         fetchPlayers();
       }, 1);
     },

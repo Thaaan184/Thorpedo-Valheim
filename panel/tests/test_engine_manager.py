@@ -59,4 +59,31 @@ def test_lifecycle_state_mock(monkeypatch):
     stopped = mgr.stop(timeout=5)
     assert stopped is True
     assert mgr.status == "stopped"
+
+def test_player_lifecycle_correlation():
+    mgr = GameServerManager()
+    
+    # 1. Handshake pending
+    mgr._handle_log_line("PlayFab socket with remote ID playfab/0123456789ABCDEF received local Platform ID Steam_76561198000000001")
+    mgr._handle_log_line("Got handshake from client playfab/0123456789ABCDEF")
+    assert "playfab/0123456789ABCDEF" in mgr.pending_connections
+
+    # 2. Character spawn
+    mgr._handle_log_line("Got character ZDOID from Vazko : 54321:1")
+    assert len(mgr.players) == 1
+    assert mgr.players[0]["character_name"] == "Vazko"
+    assert mgr.players[0]["steam_id"] == "76561198000000001"
+
+    # 3. Disconnect via playfab socket
+    mgr._handle_log_line("Closing socket playfab/0123456789ABCDEF")
+    assert len(mgr.players) == 0
+
+    # 4. Another player via ZDO destroy
+    mgr._handle_log_line("Got character ZDOID from Notsure : 99999:1")
+    assert len(mgr.players) == 1
+    assert mgr.players[0]["character_name"] == "Notsure"
+
+    mgr._handle_log_line("Destroying abandoned non persistent zdo 99999:1 owner 99999")
+    assert len(mgr.players) == 0
+
     assert mgr.process is None

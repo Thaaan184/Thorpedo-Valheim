@@ -59,6 +59,12 @@ class GameServerManager:
         self.playfab_join_code: str = ""
         self.playfab_ip: str = ""
         self.players: List[Dict[str, Any]] = []
+        # Correlation mappings for precise session tracking
+        self.playfab_to_steam: Dict[str, str] = {}
+        self.steam_personas: Dict[str, str] = {}
+        self.pending_connections: Dict[str, Dict[str, Any]] = {}
+        self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        self.zdo_to_client: Dict[str, str] = {}
         self._lock = threading.RLock()
         self._reader_thread: Optional[threading.Thread] = None
         self._auto_recovery_in_progress = False
@@ -109,44 +115,139 @@ class GameServerManager:
             with self._lock:
                 self.playfab_join_code = match_reg.group(1)
 
-        # Parse player joins
+        # 1. Player history entry (Cache Steam personas directly from engine)
+        match_hist = re.search(r"Player history entry with index \d+:\s+(.*?)\s+\(Steam_(\d+),", line)
+        if match_hist:
+            sname = match_hist.group(1).strip()
+            sid = match_hist.group(2).strip()
+            with self._lock:
+                self.steam_personas[sid] = sname
+
+        # 2. PlayFab to Steam mapping
+        match_pfs = re.search(r"PlayFab socket with remote ID playfab/(\S+) received local Platform ID Steam_(\d+)", line)
+        if match_pfs:
+            pf_id = match_pfs.group(1).strip()
+            st_id = match_pfs.group(2).strip()
+            with self._lock:
+                self.playfab_to_steam[pf_id] = st_id
+                self.playfab_to_steam[f"playfab/{pf_id}"] = st_id
+                if pf_id in self.pending_connections:
+                    self.pending_connections[pf_id]["steam_id"] = st_id
+                if f"playfab/{pf_id}" in self.pending_connections:
+                    self.pending_connections[f"playfab/{pf_id}"]["steam_id"] = st_id
+
+        # 3. Handshake pending stage
+        match_hs = re.search(r"Got handshake from client (\S+)", line)
+        if match_hs:
+            client_id = match_hs.group(1).strip()
+            with self._lock:
+                st_id = self.playfab_to_steam.get(client_id, "")
+                self.pending_connections[client_id] = {
+                    "start": time.time(),
+                    "steam_id": st_id
+                }
+
+        # 4. Parse player joins (Character Spawned in World)
         match_player = re.search(r"Got character ZDOID from ([^:]+)\s*:\s*(\S+)", line)
         if match_player:
-            name = match_player.group(1).strip()
-            with self._lock:
-                existing = next((p for p in self.players if p.get("character_name") == name), None)
-                if not existing:
-                    new_p = {
-                        "character_name": name,
-                        "steam_id": "-",
-                        "session_start": time.time(),
-                        "session_duration_str": "Just joined",
-                        "is_admin": False
-                    }
-                    self.players.append(new_p)
-                    self._handle_log_line(f"Player '{name}' joined the world (online: {len(self.players)})")
-                    ctx = self._get_context_dict()
-                    ctx["character_name"] = name
-                    ctx["steam_name"] = name
-                    dispatch_discord_event("player_join", ctx)
+            cname = match_player.group(1).strip()
+            raw_zdoid = match_player.group(2).strip()
+            # Valheim ZDOID can be <number>:1 or just <number>
+            zdoid = raw_zdoid.split(":")[0] if ":" in raw_zdoid else raw_zdoid
 
-        # Parse player leaves / disconnects
-        match_disconnect = re.search(r"Closing socket\s+(\d+)", line, re.IGNORECASE) or re.search(r"destroying abandoned non persistent zdo.*?owner\s*:\s*(\d+)", line, re.IGNORECASE)
-        if match_disconnect:
-            # Check if any player session needs to be cleaned up
             with self._lock:
-                if self.players:
-                    leaving_p = self.players.pop(0)
-                    char_name = leaving_p.get("character_name", "Ksatria")
-                    dur_secs = int(time.time() - leaving_p.get("session_start", time.time()))
-                    h, m = divmod(dur_secs, 3600)
-                    m, s = divmod(m, 60)
-                    dur_str = f"{h} jam {m} menit {s} detik" if h else f"{m} menit {s} detik"
-                    self._handle_log_line(f"Player '{char_name}' left the world (duration: {dur_str})")
-                    ctx = self._get_context_dict()
-                    ctx["character_name"] = char_name
-                    ctx["duration_str"] = dur_str
-                    dispatch_discord_event("player_leave", ctx)
+                # Find matching pending connection
+                matched_cid = None
+                st_id = ""
+                st_name = ""
+                if self.pending_connections:
+                    matched_cid = next(iter(self.pending_connections.keys()))
+                    p_info = self.pending_connections.pop(matched_cid)
+                    st_id = p_info.get("steam_id", "")
+                    if st_id:
+                        st_name = self.steam_personas.get(st_id, "")
+
+                sess_key = matched_cid or zdoid or cname
+                self.zdo_to_client[zdoid] = sess_key
+                self.zdo_to_client[raw_zdoid] = sess_key
+
+                session_entry = {
+                    "character_name": cname,
+                    "steam_id": st_id or "-",
+                    "steam_name": st_name or cname,
+                    "session_start": time.time(),
+                    "session_duration_str": "Just joined",
+                    "zdoid": zdoid,
+                    "client_id": sess_key,
+                    "is_admin": False
+                }
+                self.active_sessions[sess_key] = session_entry
+                self._sync_players_from_sessions()
+
+                self._handle_log_line(f"Player '{cname}' joined the world (online: {len(self.players)})")
+                ctx = self._get_context_dict()
+                ctx["character_name"] = cname
+                ctx["steam_name"] = st_name or cname
+                dispatch_discord_event("player_join", ctx)
+
+        # 5. Parse player leaves / disconnects
+        # Patterns:
+        # - Destroying abandoned non persistent zdo <zdoid>:1 owner <owner>
+        # - Closing socket <client_id> (supports playfab/xyz and numerical IDs)
+        # - Keep socket for playfab/<id>, try to reconnect
+        match_zdo_destroy = re.search(r"Destroying abandoned non persistent zdo\s+(\d+):1\s+owner\s+\1", line, re.IGNORECASE)
+        match_close = re.search(r"Closing socket\s+(\S+)", line, re.IGNORECASE)
+        match_keep = re.search(r"Keep socket for playfab/(\S+)", line, re.IGNORECASE)
+
+        leaving_identifier = None
+        if match_zdo_destroy:
+            leaving_identifier = match_zdo_destroy.group(1).strip()
+        elif match_close:
+            leaving_identifier = match_close.group(1).strip()
+        elif match_keep:
+            leaving_identifier = f"playfab/{match_keep.group(1).strip()}"
+
+        if leaving_identifier:
+            self._handle_player_disconnect(leaving_identifier)
+
+    def _sync_players_from_sessions(self):
+        """Update self.players list from self.active_sessions."""
+        with self._lock:
+            self.players = list(self.active_sessions.values())
+
+    def _handle_player_disconnect(self, identifier: str):
+        now = time.time()
+        session_data = None
+        with self._lock:
+            # Check 1: direct match in active_sessions
+            if identifier in self.active_sessions:
+                session_data = self.active_sessions.pop(identifier)
+            # Check 2: match via ZDOID map
+            elif identifier in self.zdo_to_client:
+                cid = self.zdo_to_client.pop(identifier)
+                if cid in self.active_sessions:
+                    session_data = self.active_sessions.pop(cid)
+            # Check 3: search by character_name, zdoid, or client_id ending
+            else:
+                for k, s in list(self.active_sessions.items()):
+                    if s.get("character_name") == identifier or s.get("zdoid") == identifier or k.endswith(identifier):
+                        session_data = self.active_sessions.pop(k)
+                        break
+
+            if session_data:
+                self._sync_players_from_sessions()
+
+        if session_data:
+            char_name = session_data.get("character_name", "Ksatria")
+            dur_secs = int(now - session_data.get("session_start", now))
+            h, m = divmod(dur_secs, 3600)
+            m, s = divmod(m, 60)
+            dur_str = f"{h} jam {m} menit {s} detik" if h else f"{m} menit {s} detik"
+            self._handle_log_line(f"Player '{char_name}' left the world (duration: {dur_str})")
+            ctx = self._get_context_dict()
+            ctx["character_name"] = char_name
+            ctx["duration_str"] = dur_str
+            dispatch_discord_event("player_leave", ctx)
 
     def _get_context_dict(self) -> Dict[str, Any]:
         with self._lock:
@@ -292,6 +393,9 @@ class GameServerManager:
                 self.start_time = time.time()
                 self.playfab_active = False
                 self.players = []
+                self.active_sessions.clear()
+                self.pending_connections.clear()
+                self.zdo_to_client.clear()
 
                 self._reader_thread = threading.Thread(
                     target=self._read_stdout,
@@ -334,6 +438,9 @@ class GameServerManager:
             self.process = None
             self.playfab_active = False
             self.players = []
+            self.active_sessions.clear()
+            self.pending_connections.clear()
+            self.zdo_to_client.clear()
 
         ctx = self._get_context_dict()
         dispatch_discord_event("server_offline", ctx)
@@ -369,6 +476,9 @@ class GameServerManager:
             self.status = "stopped"
             self.playfab_active = False
             self.players = []
+            self.active_sessions.clear()
+            self.pending_connections.clear()
+            self.zdo_to_client.clear()
         return True
 
     def send_command(self, command: str) -> bool:

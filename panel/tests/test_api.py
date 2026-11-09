@@ -86,6 +86,11 @@ def test_api_players_endpoints(auth_client):
     data = res.json()
     assert "active_players" in data
     assert "76561199999999999" in data["admins"]
+
+    # Test kick endpoint
+    res_kick = auth_client.post("/api/players/kick", json={"steam_id": "TestWarrior"})
+    assert res_kick.status_code == 200
+    assert res_kick.json()["ok"] is True
     
     res = auth_client.request("DELETE", "/api/players/admin", json={"steam_id": "76561199999999999"})
     assert res.status_code == 200

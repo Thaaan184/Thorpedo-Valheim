@@ -288,6 +288,17 @@ async def remove_admin(payload: PlayerPayload, user: str = Depends(require_auth)
     success = services.remove_admin(payload.steam_id)
     return {"success": success}
 
+@app.post("/api/players/kick")
+async def kick_player(payload: PlayerPayload, user: str = Depends(require_auth)):
+    # payload can be steam_id or character name
+    target = payload.steam_id.strip()
+    mgr = GameServerManager.get_instance()
+    # Send engine command
+    mgr.send_command(f"kick {target}")
+    # Force disconnect cleanup in manager session tracker
+    mgr._handle_player_disconnect(target)
+    return {"ok": True, "message": f"Player '{target}' kicked from realm"}
+
 @app.post("/api/players/ban")
 async def add_banned(payload: PlayerPayload, user: str = Depends(require_auth)):
     success = services.add_banned(payload.steam_id)
