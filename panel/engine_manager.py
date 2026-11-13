@@ -518,7 +518,7 @@ class GameServerManager:
             else:
                 st = "stopped"
             self.status = st
-            active_code = self.playfab_join_code if self.playfab_active else "—"
+            active_code = self.playfab_join_code if self.playfab_active else "-"
             ip_str = self.playfab_ip or os.getenv("PUBLIC_IP", "103.147.92.251:2456")
             uptime = int(time.time() - self.start_time) if st == "running" else 0
             

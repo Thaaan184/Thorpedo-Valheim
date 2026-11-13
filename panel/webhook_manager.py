@@ -3,7 +3,7 @@ import re
 import time
 import requests
 import threading
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
@@ -104,31 +104,62 @@ class WebhookDispatcher:
 
     def dispatch(self, event_type: str, context: Dict[str, Any], config: Dict[str, Any]) -> bool:
         if not config.get("enabled", True):
+            with self._lock:
+                self.last_delivery_status = {
+                    "status": "failed",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "error": "Discord integration is disabled in Settings.",
+                    "event": event_type
+                }
             return False
 
         webhook_url = config.get("webhook_url", "").strip()
         if not webhook_url or not webhook_url.startswith(("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")):
+            with self._lock:
+                self.last_delivery_status = {
+                    "status": "failed",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "error": "Invalid or missing Discord webhook URL in Settings.",
+                    "event": event_type
+                }
             return False
 
         events_conf = config.get("events", {})
         if not events_conf.get(event_type, True):
+            with self._lock:
+                self.last_delivery_status = {
+                    "status": "failed",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "error": f"Event '{event_type}' is disabled in Discord settings.",
+                    "event": event_type
+                }
             return False
 
-        # De-duplication check for server_ready and join_code_rotated
+        # De-duplication check for server_ready and join_code_rotated (bypass if force=True)
         join_code = context.get("join_code", "")
-        if event_type in ["server_ready", "join_code_rotated"]:
+        force = context.get("force", False)
+        if not force and event_type in ["server_ready", "join_code_rotated"]:
             last_code = self.last_sent.get("last_join_code")
             last_event = self.last_sent.get("last_event")
             if last_code == join_code and last_event == event_type:
                 # Duplicate event with same join code, suppress
                 return True
 
-        templates = config.get("templates", {}) or get_default_templates()
-        event_tpl = templates.get(event_type, get_default_templates().get(event_type, {}))
+        defaults = get_default_templates().get(event_type, {})
+        templates = config.get("templates", {}) or {}
+        event_tpl = templates.get(event_type, {})
 
-        title_raw = event_tpl.get("title", f"Notice: {event_type}")
-        desc_raw = event_tpl.get("description", "")
-        footer_raw = event_tpl.get("footer", config.get("footer_text", "Thorpedo Valheim Sentinel"))
+        title_raw = event_tpl.get("title")
+        if not title_raw or not str(title_raw).strip():
+            title_raw = defaults.get("title", f"Notice: {event_type}")
+
+        desc_raw = event_tpl.get("description")
+        if not desc_raw or not str(desc_raw).strip():
+            desc_raw = defaults.get("description", "")
+
+        footer_raw = event_tpl.get("footer")
+        if not footer_raw or not str(footer_raw).strip():
+            footer_raw = config.get("footer_text") or defaults.get("footer", "Thorpedo Realm • Dikabarkan oleh Hugin")
 
         # Context defaults
         full_ctx = {
@@ -222,7 +253,7 @@ class WebhookDispatcher:
     def dispatch_async(self, event_type: str, context: Dict[str, Any], config: Dict[str, Any]):
         self._executor.submit(self.dispatch, event_type, context, config)
 
-def dispatch_discord_event(event_type: str, context: Dict[str, Any], config: Optional[Dict[str, Any]] = None):
+def dispatch_discord_event(event_type: str, context: Dict[str, Any], config: Optional[Dict[str, Any]] = None, sync: bool = False) -> Tuple[bool, str]:
     from settings_manager import load_settings
     settings = load_settings()
     if config is None:
@@ -230,16 +261,31 @@ def dispatch_discord_event(event_type: str, context: Dict[str, Any], config: Opt
         # If legacy discord_webhooks format exists, merge primary
         if not config.get("webhook_url"):
             whs = settings.get("discord_webhooks", [])
-            if whs and isinstance(whs, list):
+            if whs and isinstance(whs, list) and len(whs) > 0:
                 primary = whs[0]
                 config["webhook_url"] = primary.get("url", "")
                 config["enabled"] = primary.get("enabled", True)
                 config["mention_role"] = primary.get("mention_role", "")
                 config["embed_color"] = primary.get("embed_color", "#D97706")
 
-    # Merge server access password into context if not present
-    if "access_password" not in context:
-        srv = settings.get("server", {})
-        context["access_password"] = srv.get("access_password") or srv.get("password") or ""
+    # Merge server settings into context
+    srv = settings.get("server", {})
+    if srv.get("access_password"):
+        context["access_password"] = srv.get("access_password")
+    elif "access_password" not in context:
+        context["access_password"] = srv.get("password") or ""
 
-    WebhookDispatcher.get_instance().dispatch_async(event_type, context, config)
+    if srv.get("name") and (context.get("server_name") in ["Thorpedo", "", None]):
+        context["server_name"] = srv["name"]
+    if srv.get("world_name") and (context.get("world_name") in ["BarudakValheim", "", None]):
+        context["world_name"] = srv["world_name"]
+
+    dispatcher = WebhookDispatcher.get_instance()
+    if sync:
+        ok = dispatcher.dispatch(event_type, context, config)
+        st = dispatcher.last_delivery_status or {}
+        msg = "Join Code & server credentials dispatched to Discord channel!" if ok else (st.get("error") or "Failed to deliver payload to Discord.")
+        return ok, msg
+    else:
+        dispatcher.dispatch_async(event_type, context, config)
+        return True, "Dispatched async" 

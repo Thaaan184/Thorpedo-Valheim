@@ -68,6 +68,16 @@ def load_settings() -> Dict[str, Any]:
                 # Ensure discord structure exists
                 if "discord" not in data:
                     data["discord"] = get_default_settings()["discord"]
+                else:
+                    default_tpls = get_default_templates()
+                    if "templates" not in data["discord"] or not data["discord"]["templates"]:
+                        data["discord"]["templates"] = default_tpls
+                    else:
+                        for evt, tpl in default_tpls.items():
+                            if evt not in data["discord"]["templates"]:
+                                data["discord"]["templates"][evt] = tpl
+                            elif not data["discord"]["templates"][evt].get("description"):
+                                data["discord"]["templates"][evt]["description"] = tpl.get("description", "")
                 return data
         except Exception as e:
             print(f"Error reading {SETTINGS_FILE}: {e}")

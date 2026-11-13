@@ -147,6 +147,7 @@ const TXT = {
 
 const esc = s => !s ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 const t = k => (TXT[LANG] && TXT[LANG][k]) || (TXT['en'] && TXT['en'][k]) || (TXT['id'] && TXT['id'][k]) || k;
+const DEFAULT_READY_DESC = "Kabut Dunia Kesepuluh mereda. Gerbang menuju medan tempur telah dibuka oleh Allfather.\n\n**🔑 Kunci Gerbang (Join Code):** `{join_code}`\n**🔒 Mantra Sandi (Password):** `{access_password}`\n\n**⚙️ Berkah Alam (Modifiers):**\n• Hasil Alam & Buruan: 2x Lipat\n• Gerbang Portal: Bebas Ore & Logam\n• Serbuan Monster: Sesuai Jejak Ksatria\n\n**📜 Titah Masuk:**\nBuka Valheim → **Join Game** → klik **Add Server** → masukkan Join Code & Password.\n*(Untuk pemain non-Steam/tani gunakan Join Code, bukan Join IP)*\n\n**🔄 Siklus Pemulihan Alam:**\nTiap 6 jam (Auto-Save & Sentinel Active)\n**📦 Snapshot Dunia:** `{snapshot_tag}`";
 
 const S = {
   st: 'running',
@@ -154,9 +155,9 @@ const S = {
   cpu: [],
   ram: [],
   disk: 0,
-  code: '—',
+  code: '-',
   lobby: false,
-  ip: '—',
+  ip: '-',
   pass: '••••••',
   passReal: '',
   showPass: false,
@@ -281,7 +282,7 @@ function power() {
 
 function head() {
   const L = t(S.st) || S.st.toUpperCase();
-  $('#hd').innerHTML = `<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby ? 'running' : 'bad'}">PLAYFAB ${S.lobby ? t('active') : t('stall')}</span><span class=sp></span><span class="mono mut s11" id=upt>${t('uptime')} ${S.st === 'running' ? hm(S.up) : '—'}</span>${power()}<span class=sep></span><span class="mono mut s11">ADMIN</span><a href="/logout" class="btn g d" style="margin-left:4px">${t('logout')}</a>`;
+  $('#hd').innerHTML = `<svg width=26 height=26 viewBox="0 0 26 26" fill=none stroke="#D97706" stroke-width=2><path d="M13 2v22M13 7l6-4M13 7L7 3M13 13l7-5M13 13L6 8M13 19l5-3M13 19l-5-3"/></svg><span class=brand>THORPEDO</span><span class="chip ${S.st}"><i></i>${L}</span><span class="chip ${S.lobby ? 'running' : 'bad'}">PLAYFAB ${S.lobby ? t('active') : t('stall')}</span><span class=sp></span><span class="mono mut s11" id=upt>${t('uptime')} ${S.st === 'running' ? hm(S.up) : '-'}</span>${power()}<span class=sep></span><span class="mono mut s11">ADMIN</span><a href="/logout" class="btn g d" style="margin-left:4px">${t('logout')}</a>`;
 }
 
 const TABS = ['overview', 'console', 'world', 'players', 'snap', 'mods', 'settings'];
@@ -609,7 +610,7 @@ async function poll() {
   } catch (e) {}
 
   const u = $('#upt');
-  if (u) u.textContent = t('uptime') + ' ' + (S.st === 'running' ? hm(S.up) : '—');
+  if (u) u.textContent = t('uptime') + ' ' + (S.st === 'running' ? hm(S.up) : '-');
   const v = $('#vit');
   if (v) v.innerHTML = vit();
   head();
@@ -1069,7 +1070,7 @@ document.addEventListener('click', e => {
         <div style="border-top:1px solid var(--b);padding-top:10px;margin-top:8px">
           <b style="font-size:12px;color:var(--m);display:block;margin-bottom:6px">Join Code Ready Message Template</b>
           <label>Title<input class=in id="tpl-ready-title" value="${srvTpl.title || '⚔️ {server_name} IS READY!'}"></label>
-          <label>Message Content<textarea class=in id="tpl-ready-desc" rows=3 style="font-family:inherit;font-size:12px">${srvTpl.description || ''}</textarea></label>
+          <label>Message Content<textarea class=in id="tpl-ready-desc" rows=3 style="font-family:inherit;font-size:12px">${esc(srvTpl.description || DEFAULT_READY_DESC)}</textarea></label>
           <small class=mut style="display:block;margin-top:4px;font-size:10px">Placeholders: {server_name}, {join_code}, {access_password}, {server_status}, {online_players}, {max_players}, {world_name}, {timestamp}</small>
         </div>
 

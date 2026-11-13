@@ -723,12 +723,12 @@ def execute_server_action(action: str, delay: int = 0) -> Dict[str, Any]:
         res = mgr.restart(graceful=True, delay_seconds=0)
         return {"ok": res, "message": "PlayFab lobby reset: server rebooting to forge new Join Code."}
     elif action == "broadcast_discord":
+        if mgr.status != "running":
+            return {"ok": False, "message": "Cannot broadcast: Valheim server is stopped. Start server first."}
         ctx = mgr._get_context_dict()
         ctx["force"] = True
-        dispatched = dispatch_discord_event("server_ready", ctx)
-        if dispatched:
-            return {"ok": True, "message": "Join Code & server credentials dispatched to Discord channel!"}
-        return {"ok": False, "message": "Discord broadcast failed: check webhook URL in Settings."}
+        ok, msg = dispatch_discord_event("server_ready", ctx, sync=True)
+        return {"ok": ok, "message": msg}
     return {"ok": False, "message": f"Unknown action: {action}"}
 
 def start_auto_backup_worker():
