@@ -145,7 +145,8 @@ const TXT = {
   }
 };
 
-const t = k => TXT[LANG][k] || k;
+const esc = s => !s ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+const t = k => (TXT[LANG] && TXT[LANG][k]) || (TXT['en'] && TXT['en'][k]) || (TXT['id'] && TXT['id'][k]) || k;
 
 const S = {
   st: 'running',
@@ -200,7 +201,7 @@ function lines(f, n) {
   let a = S.logs;
   if (f && FL[f]) a = a.filter(x => FL[f].includes(x[1]));
   if (n) a = a.slice(-n);
-  return a.map(x => `<div><span class=t>${x[0]}</span> <span class=${x[1]}>[${x[1]}]</span> ${x[2]}</div>`).join('') || '<div class=INFO>No logs recorded.</div>';
+  return a.map(x => `<div><span class=t>${esc(x[0])}</span> <span class="${esc(x[1])}">[${esc(x[1])}]</span> ${esc(x[2])}</div>`).join('') || '<div class=INFO>No logs recorded.</div>';
 }
 
 const spark = (a, c, mx) => {
@@ -310,7 +311,7 @@ const vit = () => {
   return `<div><span class=mut>CPU</span>${spark(S.cpu, '#D97706', 100)}<b>${c.toFixed(1)}%</b></div><div><span class=mut>RAM</span>${spark(S.ram, '#0284C7', 100)}<b>${(r / 100 * 7.98).toFixed(1)} / 8 GB</b></div><div><span class=mut>DISK</span><span style="height:6px;background:var(--b)"><i style="display:block;height:6px;width:${Math.max(5, 100 - (S.disk || 40) / 80 * 100)}%;background:var(--ok)"></i></span><b>${S.disk} GB free</b></div>`;
 };
 
-const roster = () => S.players.length ? S.players.map(p => `<tr><td><b>${p.n}</b> ${p.adm ? '<span class="tag adm">ADMIN</span>' : ''}</td><td class=mono>${p.id}</td><td class=mut>${p.t}</td><td class=mono><span class="tag ok">${p.ping}</span></td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${p.n}">Kick</button><button class="btn g d" data-a=ban data-n="${p.n}">Ban</button></div></td></tr>`).join('') : `<tr><td colspan=5 class=mut>${t('noPlayers')}</td></tr>`;
+const roster = () => S.players.length ? S.players.map(p => `<tr><td><b>${esc(p.n)}</b> ${p.adm ? '<span class="tag adm">ADMIN</span>' : ''}</td><td class=mono>${esc(p.id)}</td><td class=mut>${esc(p.t)}</td><td class=mono><span class="tag ok">${esc(p.ping)}</span></td><td class=r><div class=row><button class="btn g" data-a=kick data-n="${esc(p.n)}">Kick</button><button class="btn g d" data-a=ban data-n="${esc(p.n)}">Ban</button></div></td></tr>`).join('') : `<tr><td colspan=5 class=mut>${t('noPlayers')}</td></tr>`;
 
 const V = {
   overview: () => `<div class=grid><div><h2>${t('joinCode')}</h2>

@@ -25,6 +25,7 @@ services:
       UPDATE_ON_START: "${UPDATE_ON_START:-false}"
       AUTH_ENABLED: "${AUTH_ENABLED:-true}"
       SESSION_SECRET: "${SESSION_SECRET:-thorpedo_ultra_secure_secret_entropy_salt_9981}"
+      PANEL_SECRET_KEY: "${SESSION_SECRET:-thorpedo_ultra_secure_secret_entropy_salt_9981}"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
       GITHUB_REPO: "${GITHUB_REPO:-Thaaan184/Thorpedo-Valheim}"
       DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
@@ -33,6 +34,8 @@ services:
       - ./.env:/config/.env:rw
       - ./backups:/config/backups:rw
       - ./plugins:/valheim/BepInEx/plugins:rw
+      - ./panel:/panel:rw
+      - ./config/scheduledmessages.cfg:/valheim/BepInEx/config/scheduledmessages.cfg:rw
       - thorpedo-game-data:/valheim
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:28456/healthz || exit 1"]

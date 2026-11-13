@@ -4,12 +4,18 @@ import hashlib
 import secrets
 import json
 import time
+import shutil
 from typing import Optional
 
-CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), "credentials.json")
-SECRET_KEY_FILE = os.path.join(os.path.dirname(__file__), ".secret_key")
+DATA_DIR = os.getenv("SAVE_DIR", "/config" if os.path.exists("/config") else os.path.abspath(os.path.join(os.path.dirname(__file__), "../data")))
+CREDENTIALS_FILE = os.path.join(DATA_DIR, "panel_credentials.json")
+LEGACY_CREDENTIALS = os.path.join(os.path.dirname(__file__), "credentials.json")
+SECRET_KEY_FILE = os.path.join(DATA_DIR, ".secret_key")
 
 def get_or_create_secret_key() -> str:
+    env_secret = os.getenv("PANEL_SECRET_KEY") or os.getenv("SESSION_SECRET")
+    if env_secret and env_secret != "thorpedo_ultra_secure_secret_entropy_salt_9981":
+        return env_secret
     if os.path.exists(SECRET_KEY_FILE):
         try:
             with open(SECRET_KEY_FILE, "r") as f:
@@ -18,8 +24,12 @@ def get_or_create_secret_key() -> str:
                     return key
         except Exception:
             pass
-    key = secrets.token_hex(32)
+    if env_secret:
+        key = env_secret
+    else:
+        key = secrets.token_hex(32)
     try:
+        os.makedirs(os.path.dirname(SECRET_KEY_FILE), exist_ok=True)
         with open(SECRET_KEY_FILE, "w") as f:
             f.write(key)
         os.chmod(SECRET_KEY_FILE, 0o600)
@@ -27,7 +37,7 @@ def get_or_create_secret_key() -> str:
         pass
     return key
 
-SECRET_KEY = os.getenv("PANEL_SECRET_KEY") or get_or_create_secret_key()
+SECRET_KEY = get_or_create_secret_key()
 
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
@@ -49,7 +59,14 @@ def verify_password(password: str, hashed: str) -> bool:
 def init_credentials():
     env_user = os.getenv("PANEL_ADMIN_USER", "admin")
     env_pass = os.getenv("PANEL_ADMIN_PASSWORD", "ThorpedoAdmin2026!")
+    os.makedirs(os.path.dirname(CREDENTIALS_FILE), exist_ok=True)
     if not os.path.exists(CREDENTIALS_FILE):
+        if os.path.exists(LEGACY_CREDENTIALS):
+            try:
+                shutil.copyfile(LEGACY_CREDENTIALS, CREDENTIALS_FILE)
+                return
+            except Exception:
+                pass
         data = {
             "username": env_user,
             "password_hash": hash_password(env_pass),
@@ -57,7 +74,10 @@ def init_credentials():
         }
         with open(CREDENTIALS_FILE, "w") as f:
             json.dump(data, f, indent=2)
-        os.chmod(CREDENTIALS_FILE, 0o600)
+        try:
+            os.chmod(CREDENTIALS_FILE, 0o600)
+        except Exception:
+            pass
 
 def get_admin_user() -> dict:
     init_credentials()
@@ -75,6 +95,12 @@ def update_admin_credentials(username: str, password: Optional[str] = None):
     curr["updated_at"] = int(time.time())
     with open(CREDENTIALS_FILE, "w") as f:
         json.dump(curr, f, indent=2)
+    try:
+        if os.path.exists(LEGACY_CREDENTIALS):
+            with open(LEGACY_CREDENTIALS, "w") as f:
+                json.dump(curr, f, indent=2)
+    except Exception:
+        pass
 
 def update_admin_password(new_password: str):
     curr = get_admin_user()

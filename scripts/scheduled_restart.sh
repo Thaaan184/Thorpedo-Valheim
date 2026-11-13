@@ -55,6 +55,7 @@ echo "[$(date -Iseconds)] Mengirim sinyal graceful restart ke supervisor Thorped
 if curl -s -f http://127.0.0.1:28456/healthz > /dev/null 2>&1; then
     curl -s -X POST http://127.0.0.1:28456/api/actions/execute \
         -H "Content-Type: application/json" \
+        -H "X-Thorpedo-Internal: true" \
         -d '{"action": "restart_graceful", "delay_seconds": 0}' || true
 else
     cd "$ROOT_DIR"

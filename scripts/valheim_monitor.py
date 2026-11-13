@@ -133,7 +133,7 @@ def handle_join_code(code: str, force: bool = False):
     rel = load_latest_release_info()
     fields = [
         {"name": "🔑 Kunci Gerbang (Join Code)", "value": f"`{code}`", "inline": True},
-        {"name": "🔒 Mantra Sandi (Password)", "value": "`z315pn`", "inline": True},
+        {"name": "🔒 Mantra Sandi (Password)", "value": f"`{os.getenv('SERVER_PASSWORD') or os.getenv('SERVER_PASS', 'barudaksecret')}`", "inline": True},
         {
             "name": "⚙️ Berkah Alam (Modifiers)",
             "value": (
@@ -196,7 +196,7 @@ def broadcast_hourly_status():
 
     fields = [
         {"name": "🔑 Kunci Gerbang (Join Code)", "value": f"`{code}`", "inline": True},
-        {"name": "🔒 Mantra Sandi (Password)", "value": "`z315pn`", "inline": True},
+        {"name": "🔒 Mantra Sandi (Password)", "value": f"`{os.getenv('SERVER_PASSWORD') or os.getenv('SERVER_PASS', 'barudaksecret')}`", "inline": True},
         {"name": field_title, "value": status_pejuang, "inline": False},
         {
             "name": "🔄 Siklus Pemulihan Alam Berikutnya",

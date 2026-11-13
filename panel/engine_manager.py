@@ -201,7 +201,11 @@ class GameServerManager:
 
         leaving_identifier = None
         if match_zdo_destroy:
-            leaving_identifier = match_zdo_destroy.group(1).strip()
+            raw_zdo = match_zdo_destroy.group(1).strip()
+            # Only treat as player leave if it matches a known active player session ZDO
+            with self._lock:
+                if raw_zdo in self.zdo_to_client or any(s.get("zdoid") == raw_zdo for s in self.active_sessions.values()):
+                    leaving_identifier = raw_zdo
         elif match_close:
             leaving_identifier = match_close.group(1).strip()
         elif match_keep:
@@ -227,10 +231,16 @@ class GameServerManager:
                 cid = self.zdo_to_client.pop(identifier)
                 if cid in self.active_sessions:
                     session_data = self.active_sessions.pop(cid)
-            # Check 3: search by character_name, zdoid, or client_id ending
+            # Check 3: search by character_name, zdoid, or normalized client_id
             else:
+                clean_target = identifier.replace("playfab/", "").strip()
                 for k, s in list(self.active_sessions.items()):
-                    if s.get("character_name") == identifier or s.get("zdoid") == identifier or k.endswith(identifier):
+                    clean_k = k.replace("playfab/", "").strip()
+                    if (s.get("character_name") == identifier or
+                        s.get("zdoid") == identifier or
+                        clean_k == clean_target or
+                        k.endswith(clean_target) or
+                        identifier.endswith(clean_k)):
                         session_data = self.active_sessions.pop(k)
                         break
 
@@ -260,7 +270,7 @@ class GameServerManager:
                 "server_status": "Online" if self.status == "running" else self.status.capitalize(),
                 "online_players": str(len(self.players)),
                 "max_players": os.getenv("MAX_PLAYERS", "5"),
-                "join_code": self.playfab_join_code or "—",
+                "join_code": self.playfab_join_code or "-",
                 "access_password": pwd,
                 "server_version": "1.0+",
                 "snapshot_tag": "latest"
@@ -550,7 +560,7 @@ class GameServerManager:
             },
             "playfab": {
                 "is_active": pf_active,
-                "join_code": active_code if pf_active else "—",
+                "join_code": active_code if pf_active else "-",
                 "ip": ip_str.split(":")[0] if ":" in ip_str else ip_str,
                 "port": int(ip_str.split(":")[1]) if ":" in ip_str else 2456
             },

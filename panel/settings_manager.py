@@ -118,6 +118,9 @@ def update_server_env(name: Optional[str] = None, password: Optional[str] = None
     if not os.path.exists(ENV_FILE):
         return False
     try:
+        clean_name = name.replace("\r", "").replace("\n", "").strip() if name is not None else None
+        clean_pass = password.replace("\r", "").replace("\n", "").strip() if password is not None else None
+
         with open(ENV_FILE, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
@@ -126,32 +129,32 @@ def update_server_env(name: Optional[str] = None, password: Optional[str] = None
         pass_found = False
 
         for line in lines:
-            if (line.startswith("SERVER_NAME=") or line.startswith("SERVER_NAME ")) and name is not None:
-                new_lines.append(f"SERVER_NAME={name}\n")
+            if (line.startswith("SERVER_NAME=") or line.startswith("SERVER_NAME ")) and clean_name is not None:
+                new_lines.append(f"SERVER_NAME={clean_name}\n")
                 name_found = True
-            elif (line.startswith("SERVER_PASS=") or line.startswith("SERVER_PASSWORD=")) and password is not None:
+            elif (line.startswith("SERVER_PASS=") or line.startswith("SERVER_PASSWORD=")) and clean_pass is not None:
                 if not pass_found:
-                    new_lines.append(f"SERVER_PASS={password}\n")
-                    new_lines.append(f"SERVER_PASSWORD={password}\n")
+                    new_lines.append(f"SERVER_PASS={clean_pass}\n")
+                    new_lines.append(f"SERVER_PASSWORD={clean_pass}\n")
                     pass_found = True
             else:
                 new_lines.append(line)
 
-        if name is not None and not name_found:
-            new_lines.append(f"SERVER_NAME={name}\n")
-        if password is not None and not pass_found:
-            new_lines.append(f"SERVER_PASS={password}\n")
-            new_lines.append(f"SERVER_PASSWORD={password}\n")
+        if clean_name is not None and not name_found:
+            new_lines.append(f"SERVER_NAME={clean_name}\n")
+        if clean_pass is not None and not pass_found:
+            new_lines.append(f"SERVER_PASS={clean_pass}\n")
+            new_lines.append(f"SERVER_PASSWORD={clean_pass}\n")
 
         with open(ENV_FILE, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
 
         # Update os.environ
-        if name:
-            os.environ["SERVER_NAME"] = name
-        if password:
-            os.environ["SERVER_PASS"] = password
-            os.environ["SERVER_PASSWORD"] = password
+        if clean_name:
+            os.environ["SERVER_NAME"] = clean_name
+        if clean_pass:
+            os.environ["SERVER_PASS"] = clean_pass
+            os.environ["SERVER_PASSWORD"] = clean_pass
 
         return True
     except Exception as e:
@@ -159,7 +162,7 @@ def update_server_env(name: Optional[str] = None, password: Optional[str] = None
         return False
 
 def test_discord_webhook(webhook_url: str, mention_role: str = "", embed_color: str = "#D97706") -> Dict[str, Any]:
-    if not webhook_url or not webhook_url.startswith("https://discord.com/api/webhooks/"):
+    if not webhook_url or not webhook_url.startswith(("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")):
         return {"ok": False, "message": "Invalid Discord Webhook URL format."}
 
     color_int = 14251782

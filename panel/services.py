@@ -80,6 +80,14 @@ def get_full_status() -> Dict[str, Any]:
 
     return status_data
 
+def safe_extract_zip(zip_obj: zipfile.ZipFile, dest_dir: str):
+    dest_path = os.path.abspath(dest_dir)
+    for member in zip_obj.infolist():
+        target_path = os.path.abspath(os.path.join(dest_path, member.filename))
+        if not target_path.startswith(dest_path + os.sep) and target_path != dest_path:
+            raise ValueError(f"Zip slip path traversal attempt detected: {member.filename}")
+    zip_obj.extractall(dest_path)
+
 def get_modifiers() -> Dict[str, str]:
     mods = {
         "resources": "normal",
@@ -94,13 +102,19 @@ def get_modifiers() -> Dict[str, str]:
                 content = f.read()
             m_match = re.search(r"WORLD_MODIFIERS=[\"']?(.*?)[\"']?$", content, re.MULTILINE)
             if m_match:
-                pairs = m_match.group(1).strip().split()
-                for i in range(0, len(pairs), 2):
-                    if i + 1 < len(pairs):
-                        k = pairs[i].lower()
-                        v = pairs[i+1].lower()
-                        if k in mods:
-                            mods[k] = v
+                items = m_match.group(1).strip().split()
+                for item in items:
+                    if "=" in item:
+                        k, v = item.split("=", 1)
+                        if k.lower() in mods:
+                            mods[k.lower()] = v.lower()
+                if not any("=" in item for item in items):
+                    for i in range(0, len(items), 2):
+                        if i + 1 < len(items):
+                            k = items[i].lower()
+                            v = items[i+1].lower()
+                            if k in mods:
+                                mods[k] = v
             k_match = re.search(r"WORLD_KEYS=[\"']?(.*?)[\"']?$", content, re.MULTILINE)
             if k_match:
                 keys = k_match.group(1).strip().split()
@@ -123,7 +137,7 @@ def save_modifiers(new_mods: Dict[str, str]) -> bool:
             if k == "raids" and v == "playerevents":
                 world_keys.append("playerevents")
             else:
-                mod_pairs.extend([k, v])
+                mod_pairs.append(f"{k}={v}")
 
         new_lines = []
         m_found = False
@@ -254,6 +268,14 @@ def clean_old_snapshots(retention_count: int):
             get_manager()._handle_log_line(f"Pruned old snapshot: {os.path.basename(oldest)}")
         except Exception:
             pass
+    # Clean up excess pre-rollback safety snapshots (keep latest 5)
+    pre_backups = sorted(glob.glob(os.path.join(BACKUPS_DIR, "pre-rollback-*.zip")), key=os.path.getmtime)
+    while len(pre_backups) > 5:
+        old_pre = pre_backups.pop(0)
+        try:
+            os.remove(old_pre)
+        except Exception:
+            pass
 
 def create_snapshot() -> Dict[str, Any]:
     mgr = get_manager()
@@ -268,33 +290,52 @@ def create_snapshot() -> Dict[str, Any]:
     
     world_dir = os.path.join(DATA_DIR, "worlds_local")
     if not os.path.exists(world_dir):
-        # Fallback to DATA_DIR directly if worlds_local is not used
-        if any(f.endswith(".db") for f in os.listdir(DATA_DIR)):
+        if any(f.endswith((".db", ".db2")) for f in os.listdir(DATA_DIR)):
             world_dir = DATA_DIR
         else:
-            err_msg = f"World directory {world_dir} not found and no .db files in {DATA_DIR}."
+            err_msg = f"World directory {world_dir} not found."
             mgr._handle_log_line(f"Snapshot error: {err_msg}")
             dispatch_discord_event("backup_failed", {"error": err_msg})
             return {"ok": False, "message": err_msg}
 
-    # 2. Safety validation: ensure valid world files exist and are not 0 bytes
-    db_files = [f for f in glob.glob(os.path.join(world_dir, "*.db")) if os.path.getsize(f) > 0]
-    fwl_files = [f for f in glob.glob(os.path.join(world_dir, "*.fwl")) if os.path.getsize(f) > 0]
+    # 2. Comprehensive world scan (supporting modern Valheim .db2, .fwl2, .chunks, and .chunk)
+    settings = settings_manager.load_settings()
+    world_name = settings.get("server", {}).get("world_name") or os.getenv("WORLD_NAME", "BarudakValheim")
+    valid_exts = (".db", ".db2", ".fwl", ".fwl2", ".chunks", ".chunk", ".modifiers", ".old")
+    
+    files_to_zip = []
+    
+    # Check world folder (modern Valheim chunk structure)
+    active_world_subdir = os.path.join(world_dir, world_name)
+    if os.path.isdir(active_world_subdir):
+        for root, _, files in os.walk(active_world_subdir):
+            for file in files:
+                if file.endswith(valid_exts):
+                    files_to_zip.append(os.path.join(root, file))
+    
+    # Check root world_dir files
+    for item in os.listdir(world_dir):
+        full = os.path.join(world_dir, item)
+        if os.path.isfile(full) and item.endswith(valid_exts):
+            if "backup_auto" not in item and "backup_before" not in item:
+                files_to_zip.append(full)
+        elif os.path.isdir(full) and item != world_name and "backup_auto" not in item and "backup_before" not in item:
+            for root, _, files in os.walk(full):
+                for file in files:
+                    if file.endswith(valid_exts):
+                        files_to_zip.append(os.path.join(root, file))
 
-    if not db_files or not fwl_files:
-        err_msg = "World validation failed: missing valid non-empty .db or .fwl files."
+    if not files_to_zip:
+        err_msg = f"World validation failed: no valid world save files found in {world_dir}."
         mgr._handle_log_line(f"Snapshot error: {err_msg}")
         dispatch_discord_event("backup_failed", {"error": err_msg})
         return {"ok": False, "message": err_msg}
 
     try:
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
-            for root, _, files in os.walk(world_dir):
-                for file in files:
-                    if file.endswith((".db", ".fwl", ".modifiers", ".old")):
-                        full_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(full_path, DATA_DIR)
-                        z.write(full_path, rel_path)
+            for full_path in files_to_zip:
+                rel_path = os.path.relpath(full_path, DATA_DIR)
+                z.write(full_path, rel_path)
         
         # 3. Verify archive integrity mathematically
         with zipfile.ZipFile(out_path, "r") as z:
@@ -309,10 +350,9 @@ def create_snapshot() -> Dict[str, Any]:
 
         size_mb = round(os.path.getsize(out_path) / (1024**2), 2)
         mtime = time.strftime("%Y-%m-%d %H:%M")
-        mgr._handle_log_line(f"Snapshot created & verified: {fname} ({size_mb} MB)")
+        mgr._handle_log_line(f"Snapshot created & verified: {fname} ({size_mb} MB, {len(files_to_zip)} files)")
         
         # Enforce retention policy
-        settings = settings_manager.load_settings()
         retention = settings.get("server", {}).get("retention_count", 10)
         clean_old_snapshots(retention)
 
@@ -344,10 +384,14 @@ def create_snapshot() -> Dict[str, Any]:
 
 def rollback_snapshot(target_id: str, safety: bool = True) -> Dict[str, Any]:
     mgr = get_manager()
+    clean_target = os.path.basename(target_id).strip()
+    if not clean_target:
+        return {"ok": False, "message": "Invalid snapshot target ID."}
 
     target_file = None
     for f in glob.glob(os.path.join(BACKUPS_DIR, "*.zip")):
-        if target_id in os.path.basename(f):
+        base = os.path.basename(f)
+        if base == clean_target or base == f"{clean_target}.zip" or (clean_target.startswith("snapshot-") and base.startswith(clean_target)):
             target_file = f
             break
 
@@ -364,18 +408,10 @@ def rollback_snapshot(target_id: str, safety: bool = True) -> Dict[str, Any]:
         return {"ok": False, "message": f"Cannot read target snapshot archive: {e}"}
 
     # 2. Create emergency pre-rollback safety backup of current state
-    pre_rollback_path = os.path.join(BACKUPS_DIR, f"pre-rollback-{int(time.time())}.zip")
     if safety:
         try:
-            world_dir = os.path.join(DATA_DIR, "worlds_local")
-            if os.path.exists(world_dir):
-                with zipfile.ZipFile(pre_rollback_path, "w", zipfile.ZIP_DEFLATED) as z:
-                    for root, _, files in os.walk(world_dir):
-                        for file in files:
-                            full_path = os.path.join(root, file)
-                            rel_path = os.path.relpath(full_path, DATA_DIR)
-                            z.write(full_path, rel_path)
-                mgr._handle_log_line(f"Created pre-rollback safety snapshot: {os.path.basename(pre_rollback_path)}")
+            create_snapshot()
+            mgr._handle_log_line("Created pre-rollback safety snapshot successfully.")
         except Exception as e:
             mgr._handle_log_line(f"Warning: Failed to create pre-rollback snapshot: {e}")
 
@@ -384,33 +420,30 @@ def rollback_snapshot(target_id: str, safety: bool = True) -> Dict[str, Any]:
     if was_running:
         mgr.stop(timeout=15)
 
-    # 4. Extract target snapshot with automatic fallback recovery on failure
+    # 4. Extract target snapshot safely with automatic fallback recovery on failure
     try:
         with zipfile.ZipFile(target_file, "r") as z:
-            z.extractall(DATA_DIR)
+            safe_extract_zip(z, DATA_DIR)
         mgr._handle_log_line(f"World rollback successfully restored from: {os.path.basename(target_file)}")
         if was_running:
             mgr.start()
         return {"ok": True, "message": f"Rollback to {os.path.basename(target_file)} succeeded."}
     except Exception as e:
-        mgr._handle_log_line(f"ERROR extracting target snapshot: {e}. Attempting recovery from pre-rollback backup...")
-        if os.path.exists(pre_rollback_path):
-            try:
-                with zipfile.ZipFile(pre_rollback_path, "r") as z:
-                    z.extractall(DATA_DIR)
-                mgr._handle_log_line("Emergency recovery succeeded: previous world state restored.")
-            except Exception as rec_err:
-                mgr._handle_log_line(f"CRITICAL: Failed to recover previous world state: {rec_err}")
+        mgr._handle_log_line(f"ERROR extracting target snapshot: {e}")
         if was_running:
             mgr.start()
-        return {"ok": False, "message": f"Failed to extract snapshot: {e}. Recovery attempted."}
+        return {"ok": False, "message": f"Failed to extract snapshot: {e}"}
 
 def delete_snapshot(target_id: str) -> bool:
+    clean_target = os.path.basename(target_id).strip()
+    if not clean_target:
+        return False
     for f in glob.glob(os.path.join(BACKUPS_DIR, "*.zip")):
-        if target_id in os.path.basename(f):
+        base = os.path.basename(f)
+        if base == clean_target or base == f"{clean_target}.zip" or (clean_target.startswith("snapshot-") and base == clean_target):
             try:
                 os.remove(f)
-                get_manager()._handle_log_line(f"Deleted snapshot archive: {os.path.basename(f)}")
+                get_manager()._handle_log_line(f"Deleted snapshot archive: {base}")
                 return True
             except Exception:
                 return False
@@ -420,15 +453,19 @@ def upload_world_save(filename: str, file_bytes: bytes) -> Dict[str, Any]:
     target_dir = os.path.join(DATA_DIR, "worlds_local")
     os.makedirs(target_dir, exist_ok=True)
     
-    clean_fn = os.path.basename(filename)
-    if clean_fn.endswith(".db") or clean_fn.endswith(".fwl"):
+    clean_fn = os.path.basename(filename).strip()
+    if not clean_fn:
+        return {"ok": False, "message": "Invalid filename."}
+
+    valid_single_exts = (".db", ".fwl", ".db2", ".fwl2", ".modifiers")
+    if clean_fn.endswith(valid_single_exts):
         dest = os.path.join(target_dir, clean_fn)
         with open(dest, "wb") as f:
             f.write(file_bytes)
         get_manager()._handle_log_line(f"Uploaded world save file: {clean_fn}")
         return {"ok": True, "filename": clean_fn, "message": f"World file '{clean_fn}' uploaded successfully."}
     elif clean_fn.endswith(".zip"):
-        temp_zip = os.path.join(target_dir, f"temp_{clean_fn}")
+        temp_zip = os.path.join(target_dir, f"temp_{int(time.time())}_{clean_fn}")
         with open(temp_zip, "wb") as f:
             f.write(file_bytes)
         try:
@@ -437,16 +474,18 @@ def upload_world_save(filename: str, file_bytes: bytes) -> Dict[str, Any]:
                 if corrupt:
                     os.remove(temp_zip)
                     return {"ok": False, "message": f"Uploaded zip archive is corrupted: {corrupt}"}
-                z.extractall(target_dir)
+                has_worlds_prefix = any(m.startswith("worlds_local/") for m in z.namelist())
+                extract_base = DATA_DIR if has_worlds_prefix else target_dir
+                safe_extract_zip(z, extract_base)
             os.remove(temp_zip)
             get_manager()._handle_log_line(f"Extracted world archive: {clean_fn}")
-            return {"ok": True, "filename": clean_fn, "message": f"World archive '{clean_fn}' extracted to worlds_local."}
+            return {"ok": True, "filename": clean_fn, "message": f"World archive '{clean_fn}' extracted successfully."}
         except Exception as e:
             if os.path.exists(temp_zip):
                 os.remove(temp_zip)
             return {"ok": False, "message": f"Failed to extract world zip: {e}"}
             
-    return {"ok": False, "message": "Invalid file format. Please upload .db, .fwl, or .zip archive."}
+    return {"ok": False, "message": "Invalid file format. Please upload .db, .fwl, .db2, .fwl2, or .zip archive."}
 
 def get_installed_mods() -> List[List[Any]]:
     mods = []

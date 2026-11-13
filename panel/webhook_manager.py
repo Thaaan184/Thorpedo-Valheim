@@ -107,7 +107,7 @@ class WebhookDispatcher:
             return False
 
         webhook_url = config.get("webhook_url", "").strip()
-        if not webhook_url or not webhook_url.startswith("https://discord.com/api/webhooks/"):
+        if not webhook_url or not webhook_url.startswith(("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")):
             return False
 
         events_conf = config.get("events", {})
@@ -139,7 +139,7 @@ class WebhookDispatcher:
             "max_players": "5",
             "server_version": "1.0+",
             "access_password": "",
-            "join_code": "—",
+            "join_code": "-",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
         }
         full_ctx.update(context)
