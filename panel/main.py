@@ -298,6 +298,20 @@ async def upload_mod_api(file: UploadFile = File(...), user: str = Depends(requi
     res = services.upload_mod(fname, contents)
     return res
 
+class ModConfigPayload(BaseModel):
+    content: str
+
+@app.get("/api/mods/config/{name}")
+async def get_mod_config_endpoint(name: str, user: str = Depends(require_auth)):
+    return services.get_mod_config(name)
+
+@app.post("/api/mods/config/{name}")
+async def save_mod_config_endpoint(name: str, payload: ModConfigPayload, user: str = Depends(require_auth)):
+    res = services.save_mod_config(name, payload.content)
+    if not res.get("ok"):
+        raise HTTPException(status_code=500, detail=res.get("message", "Failed to save mod config"))
+    return res
+
 @app.get("/api/players")
 async def get_players_data(user: str = Depends(require_auth)):
     mgr = GameServerManager.get_instance()

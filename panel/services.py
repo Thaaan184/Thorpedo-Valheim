@@ -586,6 +586,52 @@ def upload_mod(filename: str, file_bytes: bytes) -> Dict[str, Any]:
 
     return {"ok": False, "message": "Invalid file format. Please upload .dll or .zip archive."}
 
+def get_mod_config(name: str) -> Dict[str, Any]:
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    clean = re.sub(r"[^\w.-]", "", os.path.basename(name).strip())
+
+    # Check exact match
+    exact = os.path.join(CONFIG_DIR, f"{clean}.cfg")
+    if os.path.exists(exact):
+        with open(exact, "r", encoding="utf-8", errors="replace") as f:
+            return {"ok": True, "name": clean, "file": f"{clean}.cfg", "content": f.read()}
+
+    # Search case-insensitively or partial match
+    lower_target = clean.lower()
+    for fname in os.listdir(CONFIG_DIR):
+        if fname.endswith(".cfg") and lower_target in fname.lower():
+            target_path = os.path.join(CONFIG_DIR, fname)
+            with open(target_path, "r", encoding="utf-8", errors="replace") as f:
+                return {"ok": True, "name": clean, "file": fname, "content": f.read()}
+
+    if lower_target in ["bepinex", "core"]:
+        bp = os.path.join(CONFIG_DIR, "BepInEx.cfg")
+        if os.path.exists(bp):
+            with open(bp, "r", encoding="utf-8", errors="replace") as f:
+                return {"ok": True, "name": "BepInEx", "file": "BepInEx.cfg", "content": f.read()}
+
+    default_cfg = f"# Configuration file for BepInEx plugin: {clean}\n[General]\n## Enable or disable plugin\nEnabled = true\n"
+    return {"ok": True, "name": clean, "file": f"{clean}.cfg", "content": default_cfg, "is_new": True}
+
+def save_mod_config(name: str, content: str) -> Dict[str, Any]:
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    clean = re.sub(r"[^\w.-]", "", os.path.basename(name).strip())
+
+    target_file = os.path.join(CONFIG_DIR, f"{clean}.cfg")
+    lower_target = clean.lower()
+    for fname in os.listdir(CONFIG_DIR):
+        if fname.endswith(".cfg") and lower_target in fname.lower():
+            target_file = os.path.join(CONFIG_DIR, fname)
+            break
+
+    try:
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        get_manager()._handle_log_line(f"Updated configuration for plugin: {os.path.basename(target_file)}")
+        return {"ok": True, "message": f"Configuration saved to {os.path.basename(target_file)}."}
+    except Exception as e:
+        return {"ok": False, "message": f"Failed to save config: {e}"}
+
 def get_admin_list() -> List[str]:
     if not os.path.exists(ADMIN_FILE):
         return []
@@ -593,22 +639,26 @@ def get_admin_list() -> List[str]:
         return [l.strip() for l in f if l.strip() and not l.startswith("//")]
 
 def add_admin(steam_id: str) -> bool:
+    clean_id = steam_id.strip()
     admins = get_admin_list()
-    if steam_id not in admins:
-        admins.append(steam_id)
+    if clean_id not in admins:
+        admins.append(clean_id)
         with open(ADMIN_FILE, "w") as f:
             f.write("\n".join(admins) + "\n")
-        get_manager()._handle_log_line(f"Added admin SteamID: {steam_id}")
+        get_manager()._handle_log_line(f"Added admin SteamID: {clean_id}")
+        get_manager().send_command(f"admin {clean_id}")
         return True
     return False
 
 def remove_admin(steam_id: str) -> bool:
+    clean_id = steam_id.strip()
     admins = get_admin_list()
-    if steam_id in admins:
-        admins.remove(steam_id)
+    if clean_id in admins:
+        admins.remove(clean_id)
         with open(ADMIN_FILE, "w") as f:
             f.write("\n".join(admins) + "\n")
-        get_manager()._handle_log_line(f"Removed admin SteamID: {steam_id}")
+        get_manager()._handle_log_line(f"Removed admin SteamID: {clean_id}")
+        get_manager().send_command(f"unadmin {clean_id}")
         return True
     return False
 
@@ -619,22 +669,26 @@ def get_banned_list() -> List[str]:
         return [l.strip() for l in f if l.strip() and not l.startswith("//")]
 
 def add_banned(steam_id: str) -> bool:
+    clean_id = steam_id.strip()
     bans = get_banned_list()
-    if steam_id not in bans:
-        bans.append(steam_id)
+    if clean_id not in bans:
+        bans.append(clean_id)
         with open(BANNED_FILE, "w") as f:
             f.write("\n".join(bans) + "\n")
-        get_manager()._handle_log_line(f"Banned SteamID: {steam_id}")
+        get_manager()._handle_log_line(f"Banned SteamID: {clean_id}")
+        get_manager().send_command(f"ban {clean_id}")
         return True
     return False
 
 def remove_banned(steam_id: str) -> bool:
+    clean_id = steam_id.strip()
     bans = get_banned_list()
-    if steam_id in bans:
-        bans.remove(steam_id)
+    if clean_id in bans:
+        bans.remove(clean_id)
         with open(BANNED_FILE, "w") as f:
             f.write("\n".join(bans) + "\n")
-        get_manager()._handle_log_line(f"Unbanned SteamID: {steam_id}")
+        get_manager()._handle_log_line(f"Unbanned SteamID: {clean_id}")
+        get_manager().send_command(f"unban {clean_id}")
         return True
     return False
 
@@ -657,6 +711,24 @@ def execute_server_action(action: str, delay: int = 0) -> Dict[str, Any]:
             return {"ok": False, "message": "Cannot save: game engine is not running."}
         mgr.send_command("save")
         return {"ok": True, "message": "Save command dispatched to engine."}
+    elif action == "check_playfab":
+        if mgr.status != "running":
+            return {"ok": False, "message": "Valheim game engine is currently stopped. Start server to probe lobby."}
+        if mgr.playfab_active and mgr.playfab_join_code:
+            ip_str = mgr.playfab_ip or "active"
+            return {"ok": True, "message": f"PlayFab Active: Join Code {mgr.playfab_join_code} on {ip_str}. Crossplay ready."}
+        return {"ok": False, "message": "PlayFab lobby is initializing. Awaiting socket handshake from master server."}
+    elif action == "reset_playfab":
+        mgr._handle_log_line("Manual PlayFab lobby reset requested: restarting engine...")
+        res = mgr.restart(graceful=True, delay_seconds=0)
+        return {"ok": res, "message": "PlayFab lobby reset: server rebooting to forge new Join Code."}
+    elif action == "broadcast_discord":
+        ctx = mgr._get_context_dict()
+        ctx["force"] = True
+        dispatched = dispatch_discord_event("server_ready", ctx)
+        if dispatched:
+            return {"ok": True, "message": "Join Code & server credentials dispatched to Discord channel!"}
+        return {"ok": False, "message": "Discord broadcast failed: check webhook URL in Settings."}
     return {"ok": False, "message": f"Unknown action: {action}"}
 
 def start_auto_backup_worker():

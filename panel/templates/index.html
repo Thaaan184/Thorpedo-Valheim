@@ -404,7 +404,7 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
               <td class=mono>${p.steam_id || 'Crossplay'}</td>
               <td class=mono>${p.session_duration_str || 'Online'}</td>
               <td><span class="tag ok">EXPLORING</span></td>
-              <td class=r><button class="btn g d" data-a=kickply data-id="${p.character_name}">Kick</button></td>
+              <td class=r><div class=row><button class="btn g" data-a=kickply data-id="${p.character_name}">Kick</button><button class="btn g d" data-a=banply data-id="${p.character_name}" data-sid="${p.steam_id || ''}">Ban</button></div></td>
             </tr>`).join('') || '<tr><td colspan=5 class=mut style="padding:14px">Hening di Sacrificial Stones... Belum ada ksatria (0 Online).</td></tr>'}
           </table>
         </div>
@@ -414,7 +414,7 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
     </div>`;
   },
 
-  snap: () => `<div class=top2><span class="mut">${t('activeWorld')} <b class=mono style="color:var(--t)">${S.srvName}</b> &nbsp; ${t('snapshotsCount')} <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn" data-a=upworld>${t('uploadWorldBtn')}</button><button class="btn p" data-a=mk>${t('createSnapBtn')}</button></div><div class=box><table><tr><th>${t('timeCol')}</th><th>${t('nameCol')}</th><th>${t('sizeCol')}</th><th>${t('locCol')}</th><th class=r>${t('actCol')}</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOCAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>${t('downloadBtn')}</button><button class="btn g d" data-a=rb data-i=${i}>${t('rollbackBtn')}</button></div></td></tr>`).join('') || `<tr><td colspan=5 class=mut>${t('noSnaps')}</td></tr>`}</table></div>`,
+  snap: () => `<div class=top2><span class="mut">${t('activeWorld')} <b class=mono style="color:var(--t)">${S.srvName}</b> &nbsp; ${t('snapshotsCount')} <b class=mono style="color:var(--t)">${S.snaps.length}</b></span><span style="flex:1"></span><button class="btn" data-a=upworld>${t('uploadWorldBtn')}</button><button class="btn p" data-a=mk>${t('createSnapBtn')}</button></div><div class=box><table><tr><th>${t('timeCol')}</th><th>${t('nameCol')}</th><th>${t('sizeCol')}</th><th>${t('locCol')}</th><th class=r>${t('actCol')}</th></tr>${S.snaps.map((s, i) => `<tr><td>${s[1]}</td><td class=mono>${s[0]}</td><td class=mono>${s[2]} MB</td><td><span class="tag ${s[3] === 'GH' ? 'gh' : ''}">${s[3] === 'GH' ? 'GITHUB' : 'LOCAL'}</span></td><td class=r><div class=row><button class="btn g" data-a=dl data-i=${i}>${t('downloadBtn')}</button><button class="btn g d" data-a=rb data-i=${i}>${t('rollbackBtn')}</button><button class="btn g d" data-a=delsnap data-i=${i} title="Delete snapshot">Del</button></div></td></tr>`).join('') || `<tr><td colspan=5 class=mut>${t('noSnaps')}</td></tr>`}</table></div>`,
 
   mods: () => `<div class=top2><span class="mut">${t('modsTitle')} &nbsp; <b class=mono style="color:var(--t)">${S.mods.length} Active</b></span><span style="flex:1"></span><button class="btn p" data-a=upmod>${t('uploadModBtn')}</button></div>
 <div class="box list">${S.mods.map((m, i) => `<div><span><b class=mono>${m[0]}</b> <span class=mut>${m[1]}</span><small>${m[2]}</small></span><span class=row><button class="btn g" data-a=cfg data-i=${i}>${t('editConfigBtn')}</button><button class="tog ${m[3] ? 'on' : ''}" data-a=tg data-i=${i}></button><button class="btn g d" data-a=delmod data-i=${i} title="Delete plugin">Delete</button></span></div>`).join('') || '<div class=mut>No plugins installed.</div>'}</div><p class="mut s11" style="margin-top:12px">${t('modRestartNotice')}</p>`,
@@ -434,7 +434,7 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
   <div class=card>
     <div class=card-head>
       <div><h3>${t('discordCardTitle')}</h3><small class=mut>Autonomous sentinel: automatically dispatches Join Codes and recovery alerts.</small></div>
-      <button class="btn p" data-a=cfgdisc>⚙️ Configure Webhook &amp; Templates</button>
+      <div class=row><button class="btn" data-a=testdiscquick>⚡ Test Webhook</button><button class="btn p" data-a=cfgdisc>⚙️ Configure Webhook &amp; Templates</button></div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap">
       <span class="tag ${d.enabled ? 'ok' : ''}">${d.enabled ? 'SENTINEL ACTIVE' : 'DISABLED'}</span>
@@ -492,6 +492,18 @@ ${totalChanges ? `<div class=bar><span style="flex:1">${totalChanges} ${t('unsav
 function render() {
   nav();
   $('#mn').innerHTML = V[S.tab]();
+    // Wire eye toggle for access password
+  const eyeBtn = $('#btn-show-acc-pass');
+  if (eyeBtn) {
+    eyeBtn.onclick = () => {
+      const inp = $('#in-acc-pass');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        eyeBtn.textContent = inp.type === 'password' ? '👁️' : '🙈';
+      }
+    };
+  }
+
   const c = $('#term');
   if (c) c.scrollTop = 1e9;
 }
@@ -665,19 +677,64 @@ document.addEventListener('click', e => {
     },
     rl: () => ask('Reset Matchmaking Lobby?', 'Server reboots gracefully and rotates PlayFab Join Code.', 'Reset Lobby', () => act('reset_playfab'), 1),
     kick: () => {
-      post('/api/console/command', { command: 'kick ' + D.n }).then(() => toast('Kick command sent for ' + D.n));
+      ask('Kick Player ' + D.n + '?', 'Disconnect character ' + D.n + ' from the server.', 'Kick', async () => {
+        await post('/api/players/kick', { steam_id: D.n });
+        toast('Player ' + D.n + ' kicked.');
+        fetchPlayers();
+      }, 1);
     },
-    ban: () => ask('Ban Player ' + D.n + '?', 'Character will be banned and disconnected from the server.', 'Ban', () => {
-      post('/api/console/command', { command: 'ban ' + D.n });
-      toast(D.n + ' banned');
+    ban: () => ask('Ban Player ' + D.n + '?', 'Character will be banned and disconnected from the server.', 'Ban', async () => {
+      await post('/api/players/kick', { steam_id: D.n });
+      await post('/api/players/ban', { steam_id: D.n });
+      toast(D.n + ' banned and added to bannedlist.txt');
+      fetchPlayers();
     }, 1),
+    banply: () => {
+      const plyName = D.id;
+      const sid = D.sid && D.sid !== '-' && D.sid !== 'Crossplay' ? D.sid : plyName;
+      ask(`Ban Warrior ${plyName}?`, `Player ${plyName} will be kicked and registered into bannedlist.txt.`, 'Ban Player', async () => {
+        await post('/api/players/kick', { steam_id: plyName });
+        await post('/api/players/ban', { steam_id: sid });
+        toast(`Player '${plyName}' banned from realm.`);
+        fetchPlayers();
+      }, 1);
+    },
+    delsnap: () => {
+      const snapName = S.snaps[D.i][0];
+      ask(`Delete Snapshot ${snapName}?`, `Are you sure you want to delete snapshot archive ${snapName}? This action cannot be undone.`, 'Delete', async () => {
+        setProgress(true);
+        try {
+          const res = await fetch(API + '/api/snapshots/' + encodeURIComponent(snapName), { method: 'DELETE' });
+          const j = await res.json();
+          if (res.ok && j.success) {
+            toast(`Snapshot ${snapName} deleted.`);
+            fetchSnapshots();
+          } else {
+            toast(j.message || 'Failed to delete snapshot', 1);
+          }
+        } catch (err) {
+          toast('Network error deleting snapshot', 1);
+        } finally {
+          setProgress(false);
+        }
+      }, 1);
+    },
+    testdiscquick: async () => {
+      toast('Dispatching test message to Discord...');
+      const res = await post('/api/settings/discord/test', {});
+      const j = await res.json();
+      toast(j.message, j.ok ? 0 : 1);
+      fetchSettings();
+    },
     f: () => { S.flt = D.v; render(); },
     clr: () => { S.logs = []; render(); },
     send: () => {
       const i = $('#ci');
       if (i && i.value.trim()) {
         const cmd = i.value.trim();
-        post('/api/console/command', { command: cmd }).then(() => {
+        post('/api/console/command', { command: cmd }).then(async r => {
+          const j = await r.json();
+          toast(j.message || 'Command executed.', j.success ? 0 : 1);
           i.value = '';
           fetchLogs();
         });
@@ -859,14 +916,58 @@ document.addEventListener('click', e => {
         toast('Failed to toggle mod', 1);
       }
     },
-    cfg: () => {
+    cfg: async () => {
       const m = S.mods[D.i];
+      const modName = m[0];
       const o = $('#ov');
       o.hidden = 0;
-      o.innerHTML = `<div class=mod><h3>${m[0]} Configuration</h3><div class=mut>Config loaded from BepInEx/config/${m[0]}.cfg:</div><label>Configuration Parameters<textarea class="in" style="height:140px;font-family:var(--mono);resize:vertical" id=cfgtext># Auto-managed config for ${m[0]}&#10;enabled = ${m[3] ? 'true' : 'false'}&#10;custom_radius = 40</textarea></label><div class=row style="justify-content:flex-end"><button class=btn data-a=x>${t('cancelBtn')}</button><button class="btn p" id=sv>${t('saveBtn')}</button></div></div>`;
-      $('#sv').onclick = () => {
-        o.hidden = 1;
-        toast('Config for ' + m[0] + ' saved. Active after restart.');
+      o.innerHTML = `<div class=mod style="max-width:680px">
+        <h3>${modName} Configuration</h3>
+        <div class=mut id="cfg-file-label">Loading real config from BepInEx/config...</div>
+        <label style="margin-top:8px">Configuration Parameters
+          <textarea class="in" style="height:220px;font-family:var(--mono);font-size:11px;resize:vertical;line-height:1.4" id=cfgtext>Loading configuration...</textarea>
+        </label>
+        <div class=row style="justify-content:space-between;margin-top:14px">
+          <span class="mut s11">Changes take effect after server reboot.</span>
+          <div class=row>
+            <button class=btn data-a=x>${t('cancelBtn')}</button>
+            <button class="btn p" id=sv>${t('saveBtn')}</button>
+          </div>
+        </div>
+      </div>`;
+
+      try {
+        const res = await fetch(API + '/api/mods/config/' + encodeURIComponent(modName));
+        const data = await res.json();
+        if (data.ok) {
+          const fl = $('#cfg-file-label');
+          if (fl) fl.textContent = 'Config file: BepInEx/config/' + data.file;
+          const ct = $('#cfgtext');
+          if (ct) ct.value = data.content || '';
+        }
+      } catch (err) {
+        const fl = $('#cfg-file-label');
+        if (fl) fl.textContent = 'Error loading configuration file';
+      }
+
+      $('#sv').onclick = async () => {
+        const newContent = $('#cfgtext').value;
+        setProgress(true);
+        try {
+          const svRes = await post('/api/mods/config/' + encodeURIComponent(modName), { content: newContent });
+          const svData = await svRes.json();
+          if (svRes.ok && svData.ok) {
+            o.hidden = 1;
+            toast('Configuration for ' + modName + ' saved!');
+            ask('Mod Config Updated: ' + modName, 'Configuration successfully written to BepInEx/config. Do you want to restart the server now to apply the changes?', 'Restart Now', () => act('restart_graceful', 0));
+          } else {
+            toast(svData.message || 'Failed to save mod config', 1);
+          }
+        } catch (err) {
+          toast('Network error saving mod config', 1);
+        } finally {
+          setProgress(false);
+        }
       };
     },
     addwh: () => {
@@ -960,6 +1061,8 @@ document.addEventListener('click', e => {
             <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-rotated" ${d.events?.join_code_rotated !== false ? 'checked' : ''}> Join Code Rotation</label>
             <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-backup-ok" ${d.events?.backup_success !== false ? 'checked' : ''}> Backup Succeeded</label>
             <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-backup-fail" ${d.events?.backup_failed !== false ? 'checked' : ''}> Backup Failed</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-join" ${d.events?.player_join !== false ? 'checked' : ''}> Warrior Joined Realm</label>
+            <label style="flex-direction:row;align-items:center;gap:8px"><input type=checkbox id="ev-leave" ${d.events?.player_leave !== false ? 'checked' : ''}> Warrior Left Realm</label>
           </div>
         </div>
 
@@ -997,8 +1100,8 @@ document.addEventListener('click', e => {
           server_crash: $('#ev-crash').checked,
           server_recovery: $('#ev-recovery').checked,
           join_code_rotated: $('#ev-rotated').checked,
-          player_join: true,
-          player_leave: true,
+          player_join: $('#ev-join') ? $('#ev-join').checked : true,
+          player_leave: $('#ev-leave') ? $('#ev-leave').checked : true,
           backup_success: $('#ev-backup-ok').checked,
           backup_failed: $('#ev-backup-fail').checked
         };
@@ -1145,9 +1248,17 @@ $('#file-mod').addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.id === 'ci') {
-    const btn = document.querySelector('[data-a=send]');
-    if (btn) btn.click();
+  if (e.key === 'Enter') {
+    if (e.target.id === 'ci') {
+      const btn = document.querySelector('[data-a=send]');
+      if (btn) btn.click();
+    } else if (e.target.id === 'in-admins') {
+      const btn = document.querySelector('[data-a=add][data-k=admins]');
+      if (btn) btn.click();
+    } else if (e.target.id === 'in-bans') {
+      const btn = document.querySelector('[data-a=add][data-k=bans]');
+      if (btn) btn.click();
+    }
   }
   if (e.key === 'Escape') {
     $('#ov').hidden = 1;
