@@ -973,7 +973,10 @@ function render() {
     const term = $('#term');
     if (term) term.scrollTop = term.scrollHeight;
     const input = $('#cmd-input');
-    if (input) input.focus();
+    const ae = document.activeElement;
+    const onNav = ae && ae.closest && ae.closest('.nav-links');
+    // A re-render must not steal focus from the tab strip or from another field.
+    if (input && !S.pendingFocus && (!ae || ae === document.body || ae === input)) input.focus();
   }
   updateHeader();
   if (S.pendingFocus) {
