@@ -67,6 +67,7 @@ def get_full_status() -> Dict[str, Any]:
     sys_m = get_system_metrics()
     status_data["server"]["memory_total_mb"] = sys_m["memory_total_mb"]
     status_data["server"]["disk_free_gb"] = sys_m["disk_free_gb"]
+    status_data["server"]["disk_total_gb"] = sys_m["disk_total_gb"]
 
     # Provide server configuration for overview & management
     settings = settings_manager.load_settings()
@@ -77,6 +78,17 @@ def get_full_status() -> Dict[str, Any]:
     status_data["server"]["auto_backup_enabled"] = server_conf.get("auto_backup_enabled", True)
     status_data["server"]["auto_backup_interval_hours"] = server_conf.get("auto_backup_interval_hours", 6)
     status_data["server"]["retention_count"] = server_conf.get("retention_count", 10)
+
+    # Backups run on an interval from process start; surface the countdown so the
+    # operator does not have to guess when the next archive lands.
+    if status_data["server"]["auto_backup_enabled"]:
+        interval = max(1, int(status_data["server"]["auto_backup_interval_hours"])) * 3600
+        elapsed = time.time() - _last_auto_backup_time
+        status_data["server"]["next_backup_in_seconds"] = max(0, int(interval - elapsed))
+    else:
+        status_data["server"]["next_backup_in_seconds"] = None
+
+    status_data["snapshot_count"] = len(glob.glob(os.path.join(BACKUPS_DIR, "*.zip")))
 
     return status_data
 
@@ -167,41 +179,79 @@ def save_modifiers(new_mods: Dict[str, str]) -> bool:
         print(f"Error saving modifiers: {e}")
         return False
 
-def get_snapshots() -> List[List[Any]]:
-    snaps = []
-    # 1. Local zip backups in BACKUPS_DIR
-    local_backups = glob.glob(os.path.join(BACKUPS_DIR, "*.zip")) + glob.glob(os.path.join(BACKUPS_DIR, "*.tar.gz"))
-    for b in sorted(local_backups, key=os.path.getmtime, reverse=True):
-        fname = os.path.basename(b)
-        size_mb = round(os.path.getsize(b) / (1024**2), 2)
-        mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(b)))
-        snaps.append([fname, mtime, size_mb, "LOKAL"])
+def get_snapshots() -> Dict[str, Any]:
+    """List local snapshot archives plus GitHub release tags.
 
-    # 2. GitHub Releases
+    Only real archives are returned. A GitHub tag cannot be rolled back locally,
+    so each entry carries `restorable` and the UI hides the rollback button when
+    the file is not on disk.
+    """
+    local: List[Dict[str, Any]] = []
+    files = glob.glob(os.path.join(BACKUPS_DIR, "*.zip")) + glob.glob(os.path.join(BACKUPS_DIR, "*.tar.gz"))
+    for path in sorted(files, key=os.path.getmtime, reverse=True):
+        fname = os.path.basename(path)
+        try:
+            size_mb = round(os.path.getsize(path) / (1024**2), 2)
+            mtime = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(path)))
+        except OSError:
+            continue
+        local.append(
+            {
+                "name": fname,
+                "time": mtime,
+                "size_mb": size_mb,
+                "storage": "local",
+                "restorable": True,
+                "kind": "pre-rollback" if fname.startswith("pre-rollback-") else "snapshot",
+            }
+        )
+
+    remote: List[Dict[str, Any]] = []
     settings = settings_manager.load_settings()
     gh = settings.get("github", {})
     token = gh.get("token") or os.getenv("GITHUB_TOKEN")
     repo = gh.get("repo") or os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
+    github_error = None
     try:
-        headers = {"Accept": "application/vnd.github.v3+json"}
-        if token and not token.startswith("your_"):
+        headers = {"Accept": "application/vnd.github.v3+json", "User-Agent": "Thorpedo-Panel"}
+        if token and not token.startswith("your_") and "..." not in token:
             headers["Authorization"] = f"Bearer {token}"
-        resp = requests.get(f"https://api.github.com/repos/{repo}/releases?per_page=10", headers=headers, timeout=3)
+        resp = requests.get(
+            f"https://api.github.com/repos/{repo}/releases",
+            params={"per_page": 10},
+            headers=headers,
+            timeout=5,
+        )
         if resp.status_code == 200:
             for rel in resp.json():
-                tag = rel.get("tag_name", "")
-                created = rel.get("created_at", "")[:16].replace("T", " ")
-                size_mb = 8.22
-                if rel.get("assets") and len(rel["assets"]) > 0:
-                    size_mb = round(rel["assets"][0].get("size", 0) / (1024**2), 2)
-                snaps.append([tag, created, size_mb, "GH"])
-    except Exception:
-        pass
+                assets = rel.get("assets") or []
+                remote.append(
+                    {
+                        "name": rel.get("tag_name", ""),
+                        "time": (rel.get("created_at", "") or "")[:16].replace("T", " "),
+                        "size_mb": round(assets[0].get("size", 0) / (1024**2), 2) if assets else 0,
+                        "storage": "github",
+                        "restorable": False,
+                        "kind": "release",
+                        "download_url": assets[0].get("browser_download_url") if assets else None,
+                    }
+                )
+        elif resp.status_code == 404:
+            github_error = f"Repository {repo} not found or token lacks access."
+        elif resp.status_code == 401:
+            github_error = "GitHub token rejected."
+        else:
+            github_error = f"GitHub API returned HTTP {resp.status_code}."
+    except Exception as exc:
+        github_error = f"GitHub unreachable: {exc}"
 
-    if not snaps:
-        snaps.append(["snapshot-initial", time.strftime("%Y-%m-%d %H:%M"), 8.22, "LOKAL"])
+    return {
+        "local": local,
+        "remote": remote,
+        "backups_dir": BACKUPS_DIR,
+        "github_error": github_error,
+    }
 
-    return snaps
 
 def upload_to_github_release(zip_path: str, tag_name: str) -> Dict[str, Any]:
     settings = settings_manager.load_settings()
@@ -438,9 +488,10 @@ def delete_snapshot(target_id: str) -> bool:
     clean_target = os.path.basename(target_id).strip()
     if not clean_target:
         return False
-    for f in glob.glob(os.path.join(BACKUPS_DIR, "*.zip")):
+    candidates = {clean_target, f"{clean_target}.zip"}
+    for f in glob.glob(os.path.join(BACKUPS_DIR, "*.zip")) + glob.glob(os.path.join(BACKUPS_DIR, "*.tar.gz")):
         base = os.path.basename(f)
-        if base == clean_target or base == f"{clean_target}.zip" or (clean_target.startswith("snapshot-") and base == clean_target):
+        if base in candidates:
             try:
                 os.remove(f)
                 get_manager()._handle_log_line(f"Deleted snapshot archive: {base}")
@@ -487,32 +538,49 @@ def upload_world_save(filename: str, file_bytes: bytes) -> Dict[str, Any]:
             
     return {"ok": False, "message": "Invalid file format. Please upload .db, .fwl, .db2, .fwl2, or .zip archive."}
 
-def get_installed_mods() -> List[List[Any]]:
-    mods = []
-    known_info = {
-        "CrossplayJoinCodeFix": ("v1.1.1", "Crossplay Join Code stability helper"),
-        "Gjallarhorn": ("v0.3.0", "Death announcer, boss banners, biome detection"),
-        "WorkbenchLove": ("v1.0.2", "Expanded workbench radius for builders (40m)"),
-        "ScheduledMessages": ("v1.0.0", "Automated broadcast messages & countdowns"),
-        "ServerDevcommands": ("v1.0.0", "Multiplayer admin command toolkit"),
-        "NoCheatFlag": ("v1.0.0", "Suppresses false positive cheat flags on items"),
-        "NetworkPerformanceSystem": ("v1.0.0", "UDP ZDO compression and lag optimization"),
-        "Jotunn": ("v2.20.0", "The Valheim Modding Library runtime")
-    }
+MOD_INFO = {
+    "CrossplayJoinCodeFix": ("v1.1.1", "Keeps the crossplay join code stable after lobby reconnects"),
+    "Gjallarhorn": ("v0.3.0", "Death announcements, boss banners, biome detection"),
+    "WorkbenchLove": ("v1.0.2", "Extends the workbench build radius to 40m"),
+    "ScheduledMessages": ("v1.0.0", "Timed broadcast messages and restart countdowns"),
+    "ServerDevcommands": ("v1.0.0", "Extra in-game admin commands"),
+    "NoCheatFlag": ("v1.0.0", "Suppresses false positive cheat flags on items"),
+    "NetworkPerformanceSystem": ("v1.0.0", "UDP ZDO compression to reduce lag"),
+    "Jotunn": ("v2.20.0", "Modding library required by several plugins"),
+    "ServerSideMap": ("v1.0.0", "Shared server map, explored by players together"),
+}
 
-    if os.path.exists(PLUGINS_DIR):
-        files = os.listdir(PLUGINS_DIR)
-        for f in sorted(files):
-            if f.endswith(".dll") or f.endswith(".dll.disabled"):
-                is_enabled = 1 if f.endswith(".dll") else 0
-                clean_name = f.replace(".dll.disabled", "").replace(".dll", "")
-                v, desc = known_info.get(clean_name, ("v1.0.0", "Custom BepInEx mod plugin"))
-                mods.append([clean_name, v, desc, is_enabled])
 
-    if not mods:
-        for name, (v, desc) in known_info.items():
-            mods.append([name, v, desc, 1])
+def get_installed_mods() -> List[Dict[str, Any]]:
+    """Return one record per plugin file found on disk.
 
+    Only files that actually exist are listed. Toggling a plugin renames the
+    file, so `.dll.disabled` means installed-but-off.
+    """
+    mods: List[Dict[str, Any]] = []
+    if not os.path.exists(PLUGINS_DIR):
+        return mods
+
+    for fname in sorted(os.listdir(PLUGINS_DIR)):
+        if not (fname.endswith(".dll") or fname.endswith(".dll.disabled")):
+            continue
+        enabled = fname.endswith(".dll")
+        name = fname[:-len(".dll.disabled")] if not enabled else fname[:-len(".dll")]
+        version, description = MOD_INFO.get(name, ("—", "Custom BepInEx plugin"))
+        try:
+            size_kb = round(os.path.getsize(os.path.join(PLUGINS_DIR, fname)) / 1024)
+        except OSError:
+            size_kb = 0
+        mods.append(
+            {
+                "name": name,
+                "version": version,
+                "description": description,
+                "enabled": enabled,
+                "file": fname,
+                "size_kb": size_kb,
+            }
+        )
     return mods
 
 def toggle_mod(name: str, enable: bool) -> bool:

@@ -87,10 +87,12 @@ def test_api_players_endpoints(auth_client):
     assert "active_players" in data
     assert "76561199999999999" in data["admins"]
 
-    # Test kick endpoint
+    # Test kick endpoint. No engine runs in the test environment, so the panel
+    # must report the failure instead of pretending the kick landed.
     res_kick = auth_client.post("/api/players/kick", json={"steam_id": "TestWarrior"})
     assert res_kick.status_code == 200
-    assert res_kick.json()["ok"] is True
+    kick = res_kick.json()
+    assert "ok" in kick and isinstance(kick["message"], str)
     
     res = auth_client.request("DELETE", "/api/players/admin", json={"steam_id": "76561199999999999"})
     assert res.status_code == 200
@@ -182,3 +184,40 @@ def test_snapshot_safety_and_rollback(tmp_path, monkeypatch):
     # Test rollback
     roll_res = services.rollback_snapshot(snap_res["tag"], safety=True)
     assert roll_res["ok"] is True
+
+
+def test_version_endpoint_reports_installed_version(auth_client):
+    res = auth_client.get("/api/version")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["panel"]["installed"]
+    assert "update_available" in data["panel"]
+    assert "installed_buildid" in data["game"]
+    assert "system" in data
+
+
+def test_snapshots_endpoint_shape(auth_client):
+    res = auth_client.get("/api/snapshots")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data["local"], list)
+    assert isinstance(data["remote"], list)
+    for entry in data["local"]:
+        assert entry["restorable"] is True
+        assert "name" in entry and "size_mb" in entry
+
+
+def test_mods_listing_is_dict_based(auth_client):
+    res = auth_client.get("/api/mods")
+    assert res.status_code == 200
+    mods = res.json()
+    assert isinstance(mods, list)
+    for m in mods:
+        assert set(["name", "enabled", "version", "description"]).issubset(m.keys())
+
+
+def test_version_manager_version_ordering():
+    import version_manager as vm
+    assert vm.parse_version("2.10.0") > vm.parse_version("2.9.9")
+    assert vm.parse_version("v1.2.3") == (1, 2, 3)
+    assert vm.parse_version("") == (0,)

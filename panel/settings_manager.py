@@ -100,13 +100,21 @@ def get_sanitized_settings() -> Dict[str, Any]:
     s = load_settings()
     sanitized = json.loads(json.dumps(s))
 
-    # Mask discord webhook
+    # Mask discord webhook. The panel can hold the URL either on the primary
+    # `discord` block or in the legacy `discord_webhooks` list, so mask whichever
+    # one is actually in use and say where it came from.
     disc = sanitized.get("discord", {})
-    url = disc.get("webhook_url", "")
-    if len(url) > 20:
-        disc["webhook_url_masked"] = url[:25] + "..." + url[-8:]
-    else:
-        disc["webhook_url_masked"] = url
+    url = disc.get("webhook_url", "") or ""
+    source = "primary" if url else ""
+    if not url:
+        for wh in sanitized.get("discord_webhooks", []) or []:
+            if (wh.get("url") or "").strip():
+                url = wh["url"].strip()
+                source = "legacy"
+                break
+    disc["webhook_url_masked"] = (url[:25] + "..." + url[-8:]) if len(url) > 20 else url
+    disc["webhook_source"] = source
+    disc["webhook_configured"] = bool(url)
     # Attach last delivery status
     disc["last_delivery"] = WebhookDispatcher.get_instance().last_delivery_status
 
@@ -170,6 +178,24 @@ def update_server_env(name: Optional[str] = None, password: Optional[str] = None
     except Exception as e:
         print(f"Error updating env file: {e}")
         return False
+
+def get_effective_webhook_url() -> str:
+    """Resolve the webhook the panel actually posts to.
+
+    The panel keeps two shapes of Discord config: a primary `discord.webhook_url`
+    and a legacy `discord_webhooks` list. Prefer the primary, fall back to the
+    first enabled entry in the list.
+    """
+    settings = load_settings()
+    url = (settings.get("discord", {}) or {}).get("webhook_url", "").strip()
+    if url and "..." not in url:
+        return url
+    for wh in settings.get("discord_webhooks", []) or []:
+        candidate = (wh.get("url") or "").strip()
+        if candidate and wh.get("enabled", True):
+            return candidate
+    return ""
+
 
 def test_discord_webhook(webhook_url: str, mention_role: str = "", embed_color: str = "#D97706") -> Dict[str, Any]:
     if not webhook_url or not webhook_url.startswith(("https://discord.com/api/webhooks/", "https://discordapp.com/api/webhooks/")):

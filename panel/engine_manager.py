@@ -179,7 +179,7 @@ class GameServerManager:
                     "session_duration_str": "Just joined",
                     "zdoid": zdoid,
                     "client_id": sess_key,
-                    "is_admin": False
+                    "is_admin": bool(st_id) and self._is_admin_steam_id(st_id)
                 }
                 self.active_sessions[sess_key] = session_entry
                 self._sync_players_from_sessions()
@@ -213,6 +213,19 @@ class GameServerManager:
 
         if leaving_identifier:
             self._handle_player_disconnect(leaving_identifier)
+
+    def _is_admin_steam_id(self, steam_id: str) -> bool:
+        """Check the server's adminlist so the roster can flag real admins."""
+        if not steam_id or steam_id == "-":
+            return False
+        data_dir = os.getenv("SAVE_DIR", "/config" if os.path.exists("/config") else "")
+        if not data_dir:
+            return False
+        try:
+            with open(os.path.join(data_dir, "adminlist.txt"), "r", encoding="utf-8", errors="replace") as fh:
+                return any(line.strip() == steam_id for line in fh if line.strip())
+        except Exception:
+            return False
 
     def _sync_players_from_sessions(self):
         """Update self.players list from self.active_sessions."""
