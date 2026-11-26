@@ -976,6 +976,10 @@ function render() {
     if (input) input.focus();
   }
   updateHeader();
+  if (S.pendingFocus) {
+    const el = document.getElementById('tab-' + S.pendingFocus);
+    if (el) { el.focus(); S.pendingFocus = null; }
+  }
 }
 
 function go(tab) {
@@ -1692,9 +1696,10 @@ document.addEventListener('keydown', e => {
     if (!tabs.length) return;
     let idx = tabs.findIndex(a => a.dataset.tab === key);
     if (idx < 0) idx = 0;
-    go(tabs[idx].dataset.tab);
-    const fresh = document.getElementById('tab-' + tabs[idx].dataset.tab);
-    if (fresh) fresh.focus();
+    S.pendingFocus = tabs[idx].dataset.tab;
+    go(S.pendingFocus);
+    const fresh = document.getElementById('tab-' + S.pendingFocus);
+    if (fresh) { fresh.focus(); S.pendingFocus = null; }
   };
   if (navLink && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     e.preventDefault();
