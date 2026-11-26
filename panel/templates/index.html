@@ -537,7 +537,8 @@ function renderNav() {
     <button class="lang-opt ${LANG === 'id' ? 'active' : ''}" data-lang="id">ID</button>
   </div>`;
   const keep = focusedId && focusedId.startsWith('tab-') ? focusedId : null;
-  const target = keep || (S.pendingFocus ? 'tab-' + S.pendingFocus : null);
+  // A deliberate move wins over whatever had focus before the rebuild.
+  const target = S.pendingFocus ? 'tab-' + S.pendingFocus : keep;
   if (target) {
     const el = document.getElementById(target);
     if (el) { el.focus(); if (S.pendingFocus) S.pendingFocus = null; }
