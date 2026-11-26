@@ -171,6 +171,8 @@ textarea.in{line-height:1.5;resize:vertical}
 
 /* switch */
 .tog{width:34px;height:19px;border-radius:10px;background:var(--line);border:0;position:relative;cursor:pointer;flex:none}
+/* The visual switch stays small; this overlay is the touch target. */
+.tog::before{content:"";position:absolute;inset:-11px -8px;border-radius:14px}
 .tog::after{content:"";position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:var(--txt);transition:left .15s ease}
 .tog[aria-checked="true"]{background:var(--ok)}
 .tog[aria-checked="true"]::after{left:18px}
@@ -231,6 +233,7 @@ textarea.in{line-height:1.5;resize:vertical}
   .seg button{padding:10px 12px;min-height:40px}
   .lang-opt{padding:8px 2px}
   .tog{width:44px;height:26px}.tog::after{width:20px;height:20px}.tog[aria-checked="true"]::after{left:21px}
+  .tog::before{inset:-9px -6px}
   .chip{min-height:32px;padding:7px 10px}
   .menu button{padding:11px 10px}
   .card-head .row{width:100%}
