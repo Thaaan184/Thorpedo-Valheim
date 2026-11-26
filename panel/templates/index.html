@@ -249,10 +249,10 @@ textarea.in{line-height:1.5;resize:vertical}
 <div id="app">
   <header id="hd"></header>
   <nav>
-    <div class="nav-links" id="nl"></div>
+    <div class="nav-links" id="nl" role="tablist" aria-label="Panel sections"></div>
     <div class="lang-box" id="lb"></div>
   </nav>
-  <main id="mn"></main>
+  <main id="mn" role="tabpanel" tabindex="-1" aria-live="polite"></main>
 </div>
 <div class="overlay" id="ov" hidden></div>
 <div id="toasts"></div>
@@ -526,7 +526,7 @@ function renderNav() {
     if (k === 'world' && pending) badge = `<span class="n" style="color:var(--warn)">${pending}</span>`;
     else if (k === 'system' && hasUpdate) badge = '<span class="dot"></span>';
     else if (count[k] !== undefined) badge = `<span class="n">${count[k]}</span>`;
-    return `<a data-tab="${k}" class="${S.tab === k ? 'on' : ''}" role="tab" tabindex="0" aria-selected="${S.tab === k}">${t('tabs')[k]}${badge}</a>`;
+    return `<a data-tab="${k}" id="tab-${k}" class="${S.tab === k ? 'on' : ''}" role="tab" tabindex="0" aria-selected="${S.tab === k ? 'true' : 'false'}" aria-controls="mn">${t('tabs')[k]}${badge}</a>`;
   }).join('');
 
   $('#lb').innerHTML = `<div class="lang-pill" role="group" aria-label="Language">
@@ -1685,6 +1685,28 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   const navLink = e.target && e.target.closest ? e.target.closest('[data-tab]') : null;
   if (navLink && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(navLink.dataset.tab); return; }
+  // Roving focus across the tablist, as the ARIA tabs pattern expects.
+  if (navLink && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    e.preventDefault();
+    const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
+    const i = tabs.indexOf(navLink);
+    const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+    if (next) { go(next.dataset.tab); next.focus(); }
+    return;
+  }
+  if (navLink && e.key === 'Home') {
+    e.preventDefault();
+    const first = document.querySelector('.nav-links [data-tab]');
+    if (first) { go(first.dataset.tab); first.focus(); }
+    return;
+  }
+  if (navLink && e.key === 'End') {
+    e.preventDefault();
+    const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
+    const last = tabs[tabs.length - 1];
+    if (last) { go(last.dataset.tab); last.focus(); }
+    return;
+  }
   if (e.key === 'Escape') {
     const ov = $('#ov');
     if (!ov.hidden) { ov.hidden = true; ov.innerHTML = ''; return; }
