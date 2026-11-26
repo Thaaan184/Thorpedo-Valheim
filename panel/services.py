@@ -209,12 +209,13 @@ def get_snapshots() -> Dict[str, Any]:
     remote: List[Dict[str, Any]] = []
     settings = settings_manager.load_settings()
     gh = settings.get("github", {})
-    token = gh.get("token") or os.getenv("GITHUB_TOKEN")
+    import version_manager
+    token = version_manager.resolve_github_token()
     repo = gh.get("repo") or os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
     github_error = None
     try:
         headers = {"Accept": "application/vnd.github.v3+json", "User-Agent": "Thorpedo-Panel"}
-        if token and not token.startswith("your_") and "..." not in token:
+        if token:
             headers["Authorization"] = f"Bearer {token}"
         resp = requests.get(
             f"https://api.github.com/repos/{repo}/releases",
@@ -256,10 +257,11 @@ def get_snapshots() -> Dict[str, Any]:
 def upload_to_github_release(zip_path: str, tag_name: str) -> Dict[str, Any]:
     settings = settings_manager.load_settings()
     gh = settings.get("github", {})
-    token = gh.get("token") or os.getenv("GITHUB_TOKEN")
+    import version_manager
+    token = version_manager.resolve_github_token()
     repo = gh.get("repo") or os.getenv("GITHUB_REPO", "Thaaan184/Thorpedo-Valheim")
 
-    if not token or token.startswith("your_") or not repo or "/" not in repo:
+    if not token or not repo or "/" not in repo:
         return {"ok": False, "message": "GitHub token or repository not properly configured in Settings."}
 
     headers = {
@@ -408,7 +410,8 @@ def create_snapshot() -> Dict[str, Any]:
 
         # Push to GitHub Release if configured
         gh_cfg = settings.get("github", {})
-        if gh_cfg.get("auto_upload_releases") and gh_cfg.get("token") and not gh_cfg.get("token", "").startswith("your_"):
+        import version_manager
+        if gh_cfg.get("auto_upload_releases") and version_manager.resolve_github_token():
             upload_to_github_release(out_path, f"snapshot-{timestamp}")
 
         # Dispatch Discord success notification

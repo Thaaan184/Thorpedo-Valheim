@@ -78,12 +78,24 @@ def parse_version(value: str):
     return tuple(int(p) for p in parts[:4]) if parts else (0,)
 
 
+def resolve_github_token() -> str:
+    """Pick the GitHub token that is actually usable.
+
+    The settings file can hold a masked value (the UI round-trips `gh...Ab18`
+    back to the API), so a masked or placeholder token is skipped in favour of
+    GITHUB_TOKEN from the environment.
+    """
+    stored = ((settings_manager.load_settings().get("github", {}) or {}).get("token") or "").strip()
+    env_token = (os.getenv("GITHUB_TOKEN") or "").strip()
+    for candidate in (stored, env_token):
+        if candidate and "..." not in candidate and not candidate.startswith("your_"):
+            return candidate
+    return ""
+
+
 def _github_auth() -> Dict[str, str]:
-    settings = settings_manager.load_settings()
-    token = (settings.get("github", {}) or {}).get("token") or ""
-    if not token or token.startswith("your_") or "..." in token:
-        return {}
-    return {"Authorization": f"Bearer {token}"}
+    token = resolve_github_token()
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
 
 def _github_repo_and_branch() -> tuple:

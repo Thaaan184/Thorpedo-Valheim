@@ -397,9 +397,11 @@ async def update_settings_api(payload: Dict[str, Any], user: str = Depends(requi
     existing = settings_manager.load_settings()
 
     # Masked values round-trip from the UI: never overwrite a real secret with a mask.
+    # If the stored token is itself a mask, fall back to the working token so the
+    # settings file heals instead of keeping an unusable value forever.
     new_gh = payload.get("github", {}) or {}
     if new_gh.get("token") and ("..." in new_gh["token"] or new_gh["token"] == "****"):
-        new_gh["token"] = existing.get("github", {}).get("token", "")
+        new_gh["token"] = version_manager.resolve_github_token()
     new_disc = payload.get("discord", {}) or {}
     if new_disc.get("webhook_url") and "..." in new_disc["webhook_url"]:
         new_disc["webhook_url"] = existing.get("discord", {}).get("webhook_url", "")
@@ -438,9 +440,8 @@ class GitHubTestPayload(BaseModel):
 @app.post("/api/settings/github/test")
 async def test_github_api(payload: GitHubTestPayload, user: str = Depends(require_auth)):
     tok = payload.token
-    if "..." in tok or not tok or tok == "****":
-        settings = settings_manager.load_settings()
-        tok = settings.get("github", {}).get("token", "")
+    if not tok or "..." in tok or tok == "****":
+        tok = version_manager.resolve_github_token()
     res = await run_in_threadpool(settings_manager.test_github_token, payload.repo, tok)
     return res
 
