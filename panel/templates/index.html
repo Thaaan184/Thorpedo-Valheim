@@ -521,6 +521,9 @@ function renderNav() {
   const pending = unsavedCount();
   const hasUpdate = S.version && ((S.version.panel && S.version.panel.update_available) ||
                      (S.version.game && S.version.game.update_available));
+  // Rebuilding the strip destroys the focused node, which silently drops focus
+  // to the body and kills the next key event. Remember and restore it.
+  const focusedId = document.activeElement && document.activeElement.id;
   $('#nl').innerHTML = TABS.map(k => {
     let badge = '';
     if (k === 'world' && pending) badge = `<span class="n" style="color:var(--warn)">${pending}</span>`;
@@ -533,6 +536,12 @@ function renderNav() {
     <button class="lang-opt ${LANG === 'en' ? 'active' : ''}" data-lang="en">EN</button>
     <button class="lang-opt ${LANG === 'id' ? 'active' : ''}" data-lang="id">ID</button>
   </div>`;
+  const keep = focusedId && focusedId.startsWith('tab-') ? focusedId : null;
+  const target = keep || (S.pendingFocus ? 'tab-' + S.pendingFocus : null);
+  if (target) {
+    const el = document.getElementById(target);
+    if (el) { el.focus(); if (S.pendingFocus) S.pendingFocus = null; }
+  }
 }
 
 function unsavedCount() {
