@@ -61,6 +61,8 @@ class GameServerManager:
         self.players: List[Dict[str, Any]] = []
         # Correlation mappings for precise session tracking
         self.playfab_to_steam: Dict[str, str] = {}
+        self.playfab_to_client: Dict[str, str] = {}
+        self.zdoid_identity: Dict[str, Dict[str, str]] = {}
         self.steam_personas: Dict[str, str] = {}
         self.pending_connections: Dict[str, Dict[str, Any]] = {}
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
@@ -147,16 +149,16 @@ class GameServerManager:
                     "steam_id": st_id
                 }
 
-        # 4. Parse player joins (Character Spawned in World)
+        # 4. Parse player joins (character spawn)
         match_player = re.search(r"Got character ZDOID from ([^:]+)\s*:\s*(\S+)", line)
         if match_player:
             cname = match_player.group(1).strip()
             raw_zdoid = match_player.group(2).strip()
-            # Valheim ZDOID can be <number>:1 or just <number>
+            # Valheim logs this twice per join: first with zdoid 0 (spawn request),
+            # then with the real id. zdoid 0 is not a session.
             zdoid = raw_zdoid.split(":")[0] if ":" in raw_zdoid else raw_zdoid
 
             with self._lock:
-                # Find matching pending connection
                 matched_cid = None
                 st_id = ""
                 st_name = ""
@@ -167,49 +169,103 @@ class GameServerManager:
                     if st_id:
                         st_name = self.steam_personas.get(st_id, "")
 
-                sess_key = matched_cid or zdoid or cname
-                self.zdo_to_client[zdoid] = sess_key
-                self.zdo_to_client[raw_zdoid] = sess_key
+                # A repeated spawn line for the same character is the same session.
+                existing_key = None
+                for key, sess in self.active_sessions.items():
+                    if sess.get("character_name") == cname and (
+                        sess.get("steam_id", "-") in ("-", st_id) or st_id in ("", sess.get("steam_id"))
+                    ):
+                        existing_key = key
+                        break
 
-                session_entry = {
-                    "character_name": cname,
-                    "steam_id": st_id or "-",
-                    "steam_name": st_name or cname,
-                    "session_start": time.time(),
-                    "session_duration_str": "Just joined",
-                    "zdoid": zdoid,
-                    "client_id": sess_key,
-                    "is_admin": bool(st_id) and self._is_admin_steam_id(st_id)
-                }
-                self.active_sessions[sess_key] = session_entry
-                self._sync_players_from_sessions()
+                if (zdoid in ("", "0") or raw_zdoid in ("", "0")) and existing_key is None and not st_id:
+                    is_new_session = False
+                    sess_key = None
+                else:
+                    is_new_session = existing_key is None
+                    sess_key = existing_key or matched_cid or zdoid or cname
 
-                self._handle_log_line(f"Player '{cname}' joined the world (online: {len(self.players)})")
-                ctx = self._get_context_dict()
-                ctx["character_name"] = cname
-                ctx["steam_name"] = st_name or cname
-                dispatch_discord_event("player_join", ctx)
+                if sess_key is not None:
+                    self.zdo_to_client[zdoid] = sess_key
+                    self.zdo_to_client[raw_zdoid] = sess_key
 
-        # 5. Parse player leaves / disconnects
-        # Patterns:
-        # - Destroying abandoned non persistent zdo <zdoid>:1 owner <owner>
-        # - Closing socket <client_id> (supports playfab/xyz and numerical IDs)
-        # - Keep socket for playfab/<id>, try to reconnect
-        match_zdo_destroy = re.search(r"Destroying abandoned non persistent zdo\s+(\d+):1\s+owner\s+\1", line, re.IGNORECASE)
+                    if is_new_session:
+                        known = self.zdoid_identity.get(zdoid, {})
+                        if not st_id and known.get("steam_id", "-") != "-":
+                            st_id = known["steam_id"]
+                            st_name = known.get("steam_name") or cname
+                        self.active_sessions[sess_key] = {
+                            "character_name": cname,
+                            "steam_id": st_id or "-",
+                            "steam_name": st_name or cname,
+                            "session_start": time.time(),
+                            "session_duration_str": "Just joined",
+                            "zdoid": zdoid,
+                            "client_id": sess_key,
+                            "playfab_id": str(matched_cid or "").replace("playfab/", "") or known.get("playfab_id", ""),
+                            "is_admin": bool(st_id) and self._is_admin_steam_id(st_id),
+                        }
+                    else:
+                        # Fill in identity learned later, keep the original start time.
+                        sess = self.active_sessions[sess_key]
+                        if st_id and sess.get("steam_id", "-") == "-":
+                            sess["steam_id"] = st_id
+                            sess["steam_name"] = st_name or sess.get("steam_name") or cname
+                            sess["is_admin"] = self._is_admin_steam_id(st_id)
+                        if zdoid and zdoid != "0":
+                            sess["zdoid"] = zdoid
+                        if matched_cid and not sess.get("playfab_id"):
+                            sess["playfab_id"] = str(matched_cid).replace("playfab/", "")
+                        if matched_cid:
+                            self.playfab_to_client[str(matched_cid).replace("playfab/", "")] = sess_key
+
+                    if matched_cid:
+                        self.playfab_to_client[str(matched_cid).replace("playfab/", "")] = sess_key
+
+                    sess_now = self.active_sessions.get(sess_key, {})
+                    if sess_now.get("steam_id", "-") != "-":
+                        self.zdoid_identity[sess_now.get("zdoid") or zdoid] = {
+                            "steam_id": sess_now["steam_id"],
+                            "steam_name": sess_now.get("steam_name", cname),
+                            "playfab_id": sess_now.get("playfab_id", ""),
+                        }
+
+                    self._sync_players_from_sessions()
+
+                if is_new_session and sess_key is not None:
+                    self._handle_log_line(f"Player '{cname}' joined the world (online: {len(self.players)})")
+                    ctx = self._get_context_dict()
+                    ctx["character_name"] = cname
+                    ctx["steam_name"] = st_name or cname
+                    dispatch_discord_event("player_join", ctx)
+
+        # 5. Parse player leaves / disconnects.
+        # Real log shapes seen in production:
+        #   Destroying abandoned non persistent zdo -1598144245:17927 owner -1598144245
+        #   Closing socket playfab/7D3054A9773D81F2
+        #   Keep socket for playfab/<id>, try to reconnect   -> a reconnect grace window,
+        #   not a leave, so it must not remove the session.
+        # The revision after the colon varies per spawn, and the id may be negative,
+        # so only the base id is compared.
+        match_zdo_destroy = re.search(
+            r"Destroying abandoned non persistent zdo\s+(-?\d+):\d+\s+owner\s+(-?\d+)", line, re.IGNORECASE
+        )
         match_close = re.search(r"Closing socket\s+(\S+)", line, re.IGNORECASE)
-        match_keep = re.search(r"Keep socket for playfab/(\S+)", line, re.IGNORECASE)
+        match_reconnect = re.search(r"Keep socket for playfab", line, re.IGNORECASE)
 
         leaving_identifier = None
         if match_zdo_destroy:
-            raw_zdo = match_zdo_destroy.group(1).strip()
-            # Only treat as player leave if it matches a known active player session ZDO
-            with self._lock:
-                if raw_zdo in self.zdo_to_client or any(s.get("zdoid") == raw_zdo for s in self.active_sessions.values()):
-                    leaving_identifier = raw_zdo
+            zdo_base, owner = match_zdo_destroy.group(1).strip(), match_zdo_destroy.group(2).strip()
+            # Only the owner's own character ZDO ends a session; the engine also
+            # destroys dozens of unrelated transient ZDOs on disconnect.
+            if zdo_base == owner:
+                with self._lock:
+                    if zdo_base in self.zdo_to_client or any(
+                        s.get("zdoid") == zdo_base for s in self.active_sessions.values()
+                    ):
+                        leaving_identifier = zdo_base
         elif match_close:
             leaving_identifier = match_close.group(1).strip()
-        elif match_keep:
-            leaving_identifier = f"playfab/{match_keep.group(1).strip()}"
 
         if leaving_identifier:
             self._handle_player_disconnect(leaving_identifier)
@@ -232,30 +288,57 @@ class GameServerManager:
         with self._lock:
             self.players = list(self.active_sessions.values())
 
+    def _resolve_session_key(self, identifier: str):
+        """Find the session key that a disconnect identifier refers to.
+
+        Caller holds the lock. Order matters: a direct id match is exact, then the
+        playfab/steam bindings recorded at handshake, then the stolen identity from
+        a previous session with the same character ZDO, and only then the character
+        name when exactly one session carries it.
+        """
+        if identifier in self.active_sessions:
+            return identifier
+
+        clean = str(identifier).replace("playfab/", "").strip()
+
+        bindings = [
+            self.playfab_to_client.get(clean),
+            self.zdo_to_client.get(identifier),
+            self.zdo_to_client.get(clean),
+        ]
+        for key in bindings:
+            if key and key in self.active_sessions:
+                return key
+
+        for key, sess in self.active_sessions.items():
+            if (sess.get("zdoid") == identifier
+                    or str(sess.get("playfab_id", "")).strip() == clean
+                    or str(sess.get("client_id")) == identifier
+                    or key.replace("playfab/", "").strip() == clean):
+                return key
+
+        steam = self.playfab_to_steam.get(clean) or self.playfab_to_steam.get(f"playfab/{clean}")
+        if steam:
+            for key, sess in self.active_sessions.items():
+                if str(sess.get("steam_id")) == str(steam):
+                    return key
+
+        by_name = [k for k, s in self.active_sessions.items() if s.get("character_name") == identifier]
+        return by_name[0] if len(by_name) == 1 else None
+
     def _handle_player_disconnect(self, identifier: str):
         now = time.time()
         session_data = None
         with self._lock:
-            # Check 1: direct match in active_sessions
-            if identifier in self.active_sessions:
-                session_data = self.active_sessions.pop(identifier)
-            # Check 2: match via ZDOID map
-            elif identifier in self.zdo_to_client:
-                cid = self.zdo_to_client.pop(identifier)
-                if cid in self.active_sessions:
-                    session_data = self.active_sessions.pop(cid)
-            # Check 3: search by character_name, zdoid, or normalized client_id
-            else:
-                clean_target = identifier.replace("playfab/", "").strip()
-                for k, s in list(self.active_sessions.items()):
-                    clean_k = k.replace("playfab/", "").strip()
-                    if (s.get("character_name") == identifier or
-                        s.get("zdoid") == identifier or
-                        clean_k == clean_target or
-                        k.endswith(clean_target) or
-                        identifier.endswith(clean_k)):
-                        session_data = self.active_sessions.pop(k)
-                        break
+            key = self._resolve_session_key(identifier)
+            if key:
+                session_data = self.active_sessions.pop(key)
+            # Forget the bindings that pointed at this session so a later join can
+            # claim the same socket id.
+            clean = str(identifier).replace("playfab/", "").strip()
+            self.playfab_to_client.pop(clean, None)
+            self.zdo_to_client.pop(identifier, None)
+            self.zdo_to_client.pop(clean, None)
 
             if session_data:
                 self._sync_players_from_sessions()
@@ -419,6 +502,8 @@ class GameServerManager:
                 self.active_sessions.clear()
                 self.pending_connections.clear()
                 self.zdo_to_client.clear()
+                self.playfab_to_client.clear()
+                self.zdoid_identity.clear()
 
                 self._reader_thread = threading.Thread(
                     target=self._read_stdout,
@@ -464,6 +549,8 @@ class GameServerManager:
             self.active_sessions.clear()
             self.pending_connections.clear()
             self.zdo_to_client.clear()
+            self.playfab_to_client.clear()
+            self.zdoid_identity.clear()
 
         ctx = self._get_context_dict()
         dispatch_discord_event("server_offline", ctx)
@@ -502,6 +589,8 @@ class GameServerManager:
             self.active_sessions.clear()
             self.pending_connections.clear()
             self.zdo_to_client.clear()
+            self.playfab_to_client.clear()
+            self.zdoid_identity.clear()
         return True
 
     def send_command(self, command: str) -> bool:
