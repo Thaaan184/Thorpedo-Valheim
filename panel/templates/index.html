@@ -1685,26 +1685,35 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   const navLink = e.target && e.target.closest ? e.target.closest('[data-tab]') : null;
   if (navLink && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(navLink.dataset.tab); return; }
-  // Roving focus across the tablist, as the ARIA tabs pattern expects.
+  // Roving focus across the tablist, as the ARIA tabs pattern expects. go()
+  // re-renders the strip, so focus has to be re-applied to the new node.
+  const moveTo = key => {
+    const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
+    if (!tabs.length) return;
+    let idx = tabs.findIndex(a => a.dataset.tab === key);
+    if (idx < 0) idx = 0;
+    go(tabs[idx].dataset.tab);
+    const fresh = document.getElementById('tab-' + tabs[idx].dataset.tab);
+    if (fresh) fresh.focus();
+  };
   if (navLink && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     e.preventDefault();
     const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
     const i = tabs.indexOf(navLink);
     const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
-    if (next) { go(next.dataset.tab); next.focus(); }
+    if (next) moveTo(next.dataset.tab);
     return;
   }
   if (navLink && e.key === 'Home') {
     e.preventDefault();
-    const first = document.querySelector('.nav-links [data-tab]');
-    if (first) { go(first.dataset.tab); first.focus(); }
+    const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
+    if (tabs.length) moveTo(tabs[0].dataset.tab);
     return;
   }
   if (navLink && e.key === 'End') {
     e.preventDefault();
     const tabs = Array.from(document.querySelectorAll('.nav-links [data-tab]'));
-    const last = tabs[tabs.length - 1];
-    if (last) { go(last.dataset.tab); last.focus(); }
+    if (tabs.length) moveTo(tabs[tabs.length - 1].dataset.tab);
     return;
   }
   if (e.key === 'Escape') {
